@@ -1,0 +1,30 @@
+# Bulky raw materials — tracked on the `talks` branch only.
+# On `main` they're gitignored so they can't be accidentally re-added.
+# Recoverable from YouTube via yt-dlp at any time; on `talks`, force-added
+# with `git add -f` (a tracked file is tracked even if .gitignore would
+# otherwise ignore it).
+fulcro_statecharts_talk/*.SRT
+fulcro_statecharts_talk/*.txt
+fulcro_statecharts_marathon/*.SRT
+fulcro_statecharts_marathon/*.txt
+
+# Claude Code project-local state (settings, transcripts, etc.)
+.claude/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
