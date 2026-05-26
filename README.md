@@ -6,10 +6,12 @@ distilled into executive summaries + key-takeaways indices for personal
 study and citation.
 
 Sister project to [`warmed-skills`](https://github.com/avidrucker/warmed-skills)
-(Casey Muratori talks) and [`yegor-pm-skills`](https://github.com/avidrucker/yegor-pm-skills)
-(Yegor Bugayenko's XDSD talk): same shape (one subdir per talk, with both
-a Casey-style executive summary and a Yegor-style timestamp index),
-applied here to Tony Kay's Fulcro statecharts content.
+(captures Casey Muratori's "Where Does Bad Code Come From?" talk) and
+[`yegor-pm-skills`](https://github.com/avidrucker/yegor-pm-skills)
+(captures Yegor Bugayenko's XDSD talk): same shape — one subdir per
+talk, with both an executive summary (TL;DR + Salient Points + Outline)
+and a key-takeaways index (timestamped emoji bullets). Applied here to
+Tony Kay's Fulcro statecharts content.
 
 The pipeline that produced the transcripts and summaries lives in the
 sister repo [`talk-distill-skills`](https://github.com/avidrucker/talk-distill-skills).
@@ -24,8 +26,8 @@ This repo holds the *outputs*; that one holds the *pipeline*.
 
 Each subdir has:
 
-- **`executive_summary.md`** — Casey-Muratori-style: TL;DR + Salient Points + Outline. First-read friendly.
-- **`key_takeaways.md`** — Yegor-Bugayenko-style: timestamped bullet index. Re-navigation friendly, jump-into-the-video friendly.
+- **`executive_summary.md`** — TL;DR + Salient Points + Outline. First-read friendly. (File shape originated in `warmed-skills/bad_code_talk/talk_summary.md`.)
+- **`key_takeaways.md`** — timestamped bullet index. Re-navigation friendly, jump-into-the-video friendly. (File shape originated in `yegor-pm-skills/XDSD_YouTube_Talk/key_takeaways.md`.)
 - **`captions.SRT`** (`talks` branch only) — raw `en-orig` auto-captions from YouTube.
 - **`transcript.txt`** (`talks` branch only) — light-edit, near-literal, speaker-labelled (`Tony Kay:` / `Host:`) paragraph transcript produced by [`talk-distill-skills`](https://github.com/avidrucker/talk-distill-skills).
 
