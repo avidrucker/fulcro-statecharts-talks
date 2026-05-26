@@ -1,0 +1,2214 @@
+[Preamble: tech check]
+
+Tony Kay: All right, Luke. It is
+
+Host: second try.
+
+Tony Kay: All right, somebody answers the call. Okay, now Lucas gets double vision.
+
+Tony Kay: Okay, and now got waking up. Okay, so my intention here is to mainly talk about the more advanced or odd or things you might not realize things about state charts. Um, but I'm going to do a real quick uh overview for those of you who haven't done much with them. And then of course after we're done talking here, there's a um uh set of exercises that already stuck on the Slack dev channel that you can clone and and uh work on that have solutions. So you can work on the exercises, you make the test pass. As I mentioned earlier, you might want to set a time limit for each exercise. And if you're not getting it, just go to the solution and and understand it. Okay, so
+
+Tony Kay: quick review just kind of terminology and what these things look like. So state charts have been around since the 80s. Uh they were defined academically by a guy named Herell. Uh and then they sort of evolved from there. He did a few years of research on refining them and then in the 90s they got pretty widely adopted uh and ended up in the worldwide web consortium's set of standards and so that standard is what I based the focal logic implementation on. So it has the exact semantics and and behavior of state charts as defined by a well- definfined standard that has semantics and you know everything's just really well defined. So if you have any question about how things are supposed to operate, you can just go look at the standard in W3C and see terminology wise a state chart has uh states and transitions. Those are
+
+Tony Kay: the main things. It's got other things called executable content as well. And the states themselves are hierarchical. So this distinguishes them from state machines, finite state machines where in finite state machines, they're flat. You have a thing that has a bunch of states and you can transition from one to the other. Uh but they aren't nested.
+
+Tony Kay: So in a state chart, you have what's called a compound state. That's a state that contains other states. And I really don't like the fact that I can't point at my slides here. So, I think I'm just going to do it in this mode. Uh,
+
+Tony Kay: maybe turn off
+
+Host: maybe share
+
+Tony Kay: slide only.
+
+Host: I'm just trying to get rid of these. There we go. That's good enough.
+
+Tony Kay: Now I can point because I just want to be able to highlight things, things like that. Right.
+
+Host: A state that has no children is typically called a leaf or atomic state.
+
+Tony Kay: And all the states have a unique ID. In fact, every node in a state chart has an ID whether or not you give it one. If you don't give it one, then it invents one. Um, there's a little side note I I'll make on that. The uh if you re-evaluate a state chart in your ripple and you have nodes that that have not been given an explicit ID, their ids will morph.
+
+Tony Kay: So that can cause in in rare cases it can cause weird behavior because the ids of of internal things change. Go ahead whoever raised their hand.
+
+Host: If a state say chart has no ID, how do you like point to it then?
+
+Tony Kay: No, no, no. The state chart itself has session IDs. That's separate. The states are the only thing that you know you probably have to give IDs to because that's the thing you target with a transition.
+
+Host: Yeah, that's what I was saying. Oh, so you're saying the state
+
+Tony Kay: I'm saying transitions have an ID. On entry nodes have an ID. Every node in the state chart has an ID whether or not you choose to assign it one.
+
+Host: Okay. Uh a a good reason for assigning
+
+Tony Kay: uh IDs to every node is because then debugging messages make a lot more sense because you can tell which node is being talked about when it says transition and it gives you some randomly generated ID.
+
+Tony Kay: Move to blah. If you had given it an ID, then you'd know which one it was. Uh without assigning it an ID, you have to guess.
+
+Tony Kay: Other questions on that?
+
+Host: No, that's that's
+
+Tony Kay: Yeah, I I guess that's we have some tests
+
+Host: for our state charts. I think some integration test that fail like if you reload the expressions
+
+Tony Kay: that's fail.
+
+Tony Kay: That's that's an example. Yeah, that's an example where the IDs being auto assigned can cause uh erratic behavior that you may not expect. Yeah.
+
+Tony Kay: Okay. Yeah.
+
+Host: Uh
+
+Tony Kay: as a side note, as part of this implementation, this top level node actually takes this tree because this each one of these functions just emits a map or a vector of maps. Um, and this
+
+Tony Kay: top level thing pulls all these out of the tree and normalizes them just sort of like folk normalizes a folk database so that the logic can look these up easily. So if you look at the actual state chart data structure that this returns uh it's got indexes in it, it's got the the nodes normalized. It's got it's got a bunch of extra stuff in it. Um even though this this kind of state here this is this is actually just nested maps it's just a big nested data structure.
+
+Tony Kay: Um so that's just an internal implementation detail. The other thing you need to know as a term is the term configuration because state charts can have more than one active state. Instead of saying the state chart is in state blah, you say the state chart has configuration and the configuration is a set of all of the states that are active. And the set will always include the topmost state and then the path down to the leaf. Right?
+
+Tony Kay: So if we're in the detail state, we're also in the dashboard state and we're also in the app state.
+
+Tony Kay: Um what if like there are several like agents like let's say parallel states would they all be configuration?
+
+Host: We'll talk about parallel here a little bit but yes the the short answer to your question is yes
+
+Tony Kay: all active all active states go in the set.
+
+Tony Kay: So one other question then is that is that like an ordered set from top down or is it just unordered? Uh that's a great question actually. The um uh there are ordered sets in state chart logic in terms of evaluating things and the order is document order.
+
+Tony Kay: Um I don't know if if uh focal logic state charts reports this set in that order. I don't think it does. It just gives you a set. These are the states that are active. But when evaluating the chart internally, it actually does use uh sets and their sort order is document order because that's how the standard specifies it
+
+Tony Kay: Um, I was going to ask how useful is this for parallel agents or maybe you can answer it when we get there because like
+
+Tony Kay: Well, okay. So, there's a difference between parallel state charts and parallel regions, right? You can run any number of state charts simultaneously in a system. Those are all running in parallel. And of course, their configurations are all different because they're different sessions. So I assume you're talking about the idea of a parallel node
+
+Tony Kay: which creates sub regions and in a parallel node every immediate sibling is active simultaneously so they'll all be in the set.
+
+Host: Okay.
+
+Tony Kay: That's all.
+
+Tony Kay: Okay. events and basic transitions. We're going to go into these in more depth later, but I just wanted this is just review. Um, events are represented in
+
+Tony Kay: this library as keywords. In the official standard, event names are just a dot tokenized uh uh um a dotepparated token sequence. So like
+
+Tony Kay: without the colon, right? So in the standard they look like that. And since in closure we represent these kinds of things as keywords, we represent them with the colon in front. I made one extension to the standard here and that's that uh slash acts like a dot as far as tokenization goes.
+
+Tony Kay: Right? Does everybody know what I mean when I say tokenization?
+
+Tony Kay: Like breaking apart into pieces.
+
+Tony Kay: So this has one token login. This has two tokens, error and network. And this has two tokens, error and network.
+
+Tony Kay: Go ahead with the question if that didn't answer it.
+
+Host: Okay. So, you're saying the error.net network in your library is exactly the same thing as error network.
+
+Tony Kay: Yes. Slash and dot are are treated interchangeably in terms of tokenizing uh the event names. And we'll get to why that's important here in a minute. Some of you probably already know.
+
+Tony Kay: Events can carry an arbitrary map of data. It's just a closure map. And events can actually have a type, internal or external. And again, we'll we'll get to those in in a bit in terms of the difference between how they how they uh run. Uh the difference between the two. Uh but the short the short thing is that a raise node in the chart is an internal event and external events are placed on the queue with a send. So there's an external event Q.
+
+Tony Kay: Right? So there's actually two event cues in state charts.
+
+Tony Kay: Transitions are how you get from state to state. Transitions uh match an event.
+
+Tony Kay: They can also be eventless, right? So the event part is optional.
+
+Tony Kay: They can optionally have a guard um uh and the guard is just a condition that has to be true for the transition to be what's called enabled.
+
+Tony Kay: They have uh optional target and the
+
+Tony Kay: target can be plural. This has to do with parallel states that that Jeremy's been referring to. We'll talk about that in a moment. Like where should the transition go? Doesn't have a target.
+
+Tony Kay: It's there just to respond to uh uh an
+
+Tony Kay: event. Is the event optional? I may be misremembering that transition can be a Can a transition be eventless? I believe it can. It just fires if its guard is true.
+
+Host: Yeah.
+
+Tony Kay: Yeah. I I think it's correct.
+
+Host: No, that's absolutely true. Um these can contain executable content children.
+
+Tony Kay: Executable content as a reminder are things like on entry, onexit, script. Uh
+
+Tony Kay: there's also uh ones I added recently that are part of the standard that I hadn't added yet. If else raise. So any
+
+Tony Kay: node that tells the chart to do something to the world, either modify the data model, run a side effect, uh send a delayed event to the state chart at some later time. All that's considered executable content.
+
+Tony Kay: And then these have an internal external type which means something different than the internal or external type of event. Same word different meaning. And we'll talk about the semantics of internal versus external on transitions when we get to that.
+
+Tony Kay: Um any questions on the basics though?
+
+Tony Kay: Okay. What I wanted to insert in here that I didn't have time to to make a slide for and I'll just go and show you in the source code is that the state charts library uh my state chart library uh tries to abstract out all the possible things that you might want to replace depending on your execution environment uh for your state charts. So state charts have the idea that you can store some data locally to the chart that the chart can manipulate or read as it runs.
+
+Tony Kay: And there there are two basic things really three three basic things you can do with a data model. At startup you can load data from someplace right. So, so there's a node you can put in the in the in the chart near the top that says you want data to be initialized in some way. Uh, the data model protocol lets you abstractly define how you get to that and load it, right? So, you might, you know, you might load a an Eden file from disk,
+
+Tony Kay: right? That sort of thing. Uh, or you might have them colllocate the the data that they want to supply right there on the node. uh but ba basically the standard says there should be some way for the data model element in the machine to pull in some initial data into the data model. You need to be able to retrieve the current data get something at a path where the path is a vector of keywords with an arbitrary meaning that you define in the data model and a way to update that data uh via data operations. I made this operation based so that you could extend the data operations on the data model uh to do more interesting things like you know folk apply action that sort of thing. Uh so so this makes the data model completely pluggable. Uh and this is also how we do things like on our our uh uh server side state charts. Uh we're we're able to persist the data model that the state chart is tracking into an SQL database.
+
+Tony Kay: We have an event Q. This is for the external event Q. So again in the um in the fulcr integration of state charts, the external event Q is implemented just as a core async thing that just runs as a local threadlike thing in your app. on
+
+Tony Kay: our server side state charts in Dao. Our event Q on the server is actually implemented as an SQL table and algorithms around being able to send them and process them.
+
+Tony Kay: the execution model. The idea here is that in the expression say in a script tag uh you might want in say a front end
+
+Tony Kay: state chart you might want the user to be able to provide JavaScript uh as their expression just as a string uh or you might want the user to be able to supply closure as a string that you execute with say sigh uh or you might want an execution model where they just hand you lambdas. So the idea here is you can plug in uh an alternative for running the executable nodes. Uh where the the notation on the executable node can be anything you wanted to define it to be. Uh as long as you can write something that can run those expressions. Uh on all of our state charts at the Tao, we all just use CLJC expressions, right? These are just lambdas. Uh so this execution model is pretty simple.
+
+Tony Kay: the processor protocol has to do with running the actual algorithm itself. So if you go and look at this W3C standard for state charts, uh the current one I think was written in September of 2015, but there are multiple versions before that at prior years. Uh so the state chart standard evolved um and since there's some possibility in the future it might evolve again or maybe you want to select the semantics and and runtime behavior of an older version because you like it better. This allows you to plug in a different algorithm for your state charts um uh just by implementing this protocol.
+
+Tony Kay: Uh so this is this is intended right we've got for example state charts in dao that run for long periods of time and you wouldn't want to change the algorithm that those run internally.
+
+Tony Kay: So you can imagine that for dao you want to pin the state chart processor to a particular version of the algorithm even if the library were to invent and define another one. uh so in in keeping with my
+
+Tony Kay: desire to make my libraries 100% backward compatible whenever possible but allow for a forward you know a path forward an easy path forward uh this this allows you to have that right some new version could come out I could define the new algorithm and you can opt into it at some later time if it works for you better or not you can just keep using the old one uh there's an invocation processor So this protocol has to do with the fact that state charts define uh a way to invoke other things.
+
+Tony Kay: Um the only invocation processor that's usually required is one that can invoke other state charts. Um but this is allowed to invoke basically anything at all. Uh you could have this invoke a web worker on the front end in JavaScript and run something in a thread that has like a compile of solidity uh for Ethereum's contracts or something, right? It it doesn't have to be a state chart. Uh basically the the interface between state charts and an invocation is that you can start it, you can forward events to it from the parent state chart and then it can do whatever it wants with the events. You can stop it because when an invocation is left in a state chart, it's supposed to stop the thing it invoked. Um and then you can ask your list of invocation processors, hey do you support this particular type of invocation? Right. So this is basically just discovery.
+
+Tony Kay: Are are we going to have like examples on these? Because I I would like to I've actually asked um an AI to actually explore codebase so it could explain it to me. Are you going to are we going to run through any
+
+Tony Kay: We're going to run through some of this. Uh invocations I'm not going to do in great detail. Um uh the the point of this little part of the discussion is just to show you that the design of the Fulcr is meant to be
+
+Tony Kay: very flexible which is why we can use it in Fulcro and on the back end in completely different use case kinds of environments where one the back end runs state charts that might run for years and have to be reliable and the front end runs state charts that maybe run a wizard and if you reload the page All right, you just reset all your state charts, right? That sort of thing.
+
+Tony Kay: Um, so I'm just trying to give you the ideas of of what's here that's that can
+
+Tony Kay: be manipulated, right? So this is less about knowing how to manipulate it and more just being aware that the ability to manipulate it exists or extend it exists. Does that make sense? Yeah, of course.
+
+Tony Kay: Okay. And then the last two are the state chart registry. This is just where do I store the definition of state charts so that when I go to run an event from a state chart that started a month ago, right, I didn't keep that thing in memory. Uh I need to be able to reconstitute it from some sort of storage. Um I need to be able to find a state chart, right? That's essentially what a state chart registry is about.
+
+Tony Kay: And then working memory store has to do with uh actually this is the separate concern. The data model up here was reading and writing the data model. And this down here has to do with being able to store uh uh everything about a given
+
+Tony Kay: uh session. So a state chart's running.
+
+Tony Kay: It has a configuration. It has a data model. Uh and when the processor right
+
+Tony Kay: the thing that that has the algorithm in it goes to process an event in order to do that it needs the working memory uh and the event and the working memory
+
+Tony Kay: includes the type of thing that's running the state chart um definition the registry key. So this process event this end contains all of the different implementations of these protocols. So it can find the data model, it can find the event Q, it can find right, it has all those things available. Um so when you process an event, it can look up any of these protocols in the end uh to run this event starting from this current working memory. get back the working memory and then save it back to whatever store it's stored in. So the the the Tao loop say for the server side processing is get the working memory process it in the processor which gives you back a new version of the working memory and then save it in the working memory that's that's processing an event question
+
+Host: um I have two questions one about the registry and the other about the working memory store
+
+Tony Kay: so uh for the working memory store like is this going to be saving for every event or does it try to batch
+
+Host: no batching every event.
+
+Tony Kay: Isn't that um so is there any performance concern or I don't know
+
+Host: um
+
+Tony Kay: is there a performance concern? Typically not. So if if you were let me give you the the two environments that we run things in. Um so in the front end
+
+Tony Kay: uh your working memory is uh let's see now what is it in in it's the actual app database right it's the state map it's it's it's actually normalized into the focal state map so it's a swap on an atom
+
+Tony Kay: right getting it is is a dref of the atom saving it's a swap on the atom that's very fast uh so you can very easily run you know many many many events per second uh because it's all it's all just in memory The server side state charts aren't meant to run individual state charts thousands of times a second. You're not doing animation with them. You're doing things like subscriptions where an event maybe fires at most once a month. So, uh the the performance of an individual state chart isn't really a problem. You've got to pull the working memory from SQL, process the event, which maybe has to create an invoice and talk to the Dion, right? That could be a couple of seconds, right? Give you back the new working memory. uh save that in SQL.
+
+Tony Kay: So
+
+Host: okay.
+
+Tony Kay: Yeah. Um a question was which protocol is orchestrating this like because you mentioned how different parts of this are um pluggable likeable
+
+Tony Kay: using this protocol. So let's say a person wants to do something where whereby maybe um it fetches a bunch of working memory in batch and you know executes them and save them one at a time like which protocol can
+
+Tony Kay: well you wouldn't do that. you you need you need exactly one semantics and so this actually gets fairly complicated.
+
+Tony Kay: Um uh oh
+
+Tony Kay: is this not indexed yet? All right so we'll stay we'll stay here for the moment. Um so for example uh let's say
+
+Tony Kay: you're talking about the server side state charts right so in the front end JavaScript single thread you run an event to completion you're done you put it back you let go of the thread whatever happens happens but there's only one thread right so so the idea of batch processing and parallel processing isn't even defined so let's talk about the server where we do have the possibility to to do things in parallel um uh we have all sorts of state charts in the system. And of course, the more
+
+Tony Kay: state charts you get, the more sessions you get running, the more probability that any given second you might have lots of events to process. Let's say we had a sale, right? And um a whole bunch of people signed up and and got new subscriptions, say a thousand of them, all in the same day, all within a relatively short period of time. That would be a lot of parallel events to process in potentially a relatively short period of time where those events because they're creating invoices and doing side effects things like that each event might take several seconds to run right um early on the first implementation of the SQL event Q into Tyco for simplicity was single threaded there was only one thread um and then we discovered do you remember this Nico I think you were around some somebody was here here was was around uh we discovered that the state charts like the subscriptions were running like like 90 days behind something like that some extremely crazy number because the queue was so backed up from that single thread trying to keep up with them that it just couldn't keep up.
+
+Tony Kay: Um I don't know if it was quite that bad but it it it was backed up quite a ways.
+
+Tony Kay: So we had to convert to a multi-threaded processing uh where where we process these in parallel. And so then the rule is you can't have two threads running an event for the same session, right? That would be two things that read the same working memory, did different events, and then tried to save back the working memory. One would overwrite the other. That'd be bad,
+
+Tony Kay: right? So we have a thread pool and then we have a very complex sequence of transactional logic and locking that that ensures that any given thread uh uh
+
+Tony Kay: or no two threads will run an event for the same session at the same time yet will allow us to run as many s as many non-equal sessions in parallel as we have threads.
+
+Tony Kay: long answer but does that
+
+Host: answer your question basically?
+
+Tony Kay: Um yeah I I do so like um that custom processing logic like which protocols did you had to hook into or like provide your own implementation in order to do that
+
+Host: right and that's what I was trying to show you here
+
+Tony Kay: that's on the base environment perhaps
+
+Host: is it in base end
+
+Tony Kay: like the file
+
+Host: that's like our proxy environment so you can find everything there
+
+Tony Kay: yeah that's the environment but where's where's the um process event. I was going to show the actual loop.
+
+Host: Oh, the loop. That's an event.
+
+Tony Kay: Yeah, this is it. This is what it looks like.
+
+Tony Kay: And this is for delivering a synchronous event. But the loop that that has all the threads looks very similar to this. So we obtain a lock for the session. We create a transaction so that we either do everything with respect to the state chart in the database or it all gets rolled back and it'll retry on a separate try. Uh we get them working memory which is just calling that protocol get working memory. These are just wrappers for mocking. Um we process the event.
+
+Tony Kay: uh we record the fact that we did it which is uh uh us updating the event
+
+Tony Kay: table. So this is where we store the events that need to be delivered to say that the event was delivered, right? So we're setting the the delivered flag to true here. So we won't redeliver the event. This is why we need a transaction is because we don't want to mark the event delivered without actually saving its working memory and vice versa. We wouldn't want to save it or mark it.
+
+Tony Kay: Yeah, you get it. Um,
+
+Host: yeah,
+
+Tony Kay: right. And then if the state chart finished, then we want to delete the working memory out of the SQL table. Otherwise, we want to resave the working memory in the table. That's it. So, so basically you just have a loop that that that looks for. In the case of delivering an event synchronously where we're recording the event in the table already complete and an event that was in the table, we have a select that looks for the events that aren't delivered whose time to deliver has passed.
+
+Tony Kay: Right?
+
+Host: And then we just do this exact thing. Get the working memory, process the event, write it back.
+
+Tony Kay: Oh, I see. That's for the synchronous event, right?
+
+Host: This one is synchronous. Yeah. Yeah. The the loop is is somewhere else and we don't need to look
+
+Tony Kay: the at the at the bottom is the same.
+
+Host: Yeah, there you go.
+
+Tony Kay: I guess the main point is that it's our own process that is doing the processing using the protocols. Exactly.
+
+Host: I was think maybe the fur library is the one to do that and we need to override another protocol to
+
+Tony Kay: you. You can't no you can't really do this at the library level because you need these kind of complex things to do the to do the uh transactional semantics of it.
+
+Tony Kay: Uh so rather than rather than define that right that it just doesn't make sense. It's it's too complex given what data stores you select and what semantics they have. Uh you may have to do you know crazy back flips depending on what you decide. And all I wanted to do is make it so that uh if someone had to defined a store you wanted to use and someone had defined the processor that you wanted to use etc. Uh you could plug it in here and you right you you'd have some chance of getting everything
+
+Tony Kay: right.
+
+Host: Okay. And I had another question regarding the history.
+
+Tony Kay: Um sure.
+
+Tony Kay: Do you mind going over what exactly it is like? Um cuz I I'm also sort of confused as to where the state chart is uh stored and how I know the um UI state machine is simply a map in which you can get it and you know modify it and do whatever but then I still struggle to uh see the um state chart that way and you mentioned it's inside the DB and I don't know whether it's global state the registry
+
+Tony Kay: right so when you define a state chart it's just data and when you register it you give it a global name typically a namespaced keyword word um that puts it in this registry. This is this is typically like on the front end. This is just a a map and an atom. That's all the state chart registry is. Uh in our backend uh uh state charts, it's also that um uh it's it's it's an in-memory representation for looking things up. Uh it's not actually persisted. This is so you can right if we if we were to persist the definition of the state chart that would be hard to bug fix them.
+
+Host: All right.
+
+Tony Kay: Right. But the runtime system needs to be able to when it goes to process an event. It needs to be able to find the state chart. Right. I've got an event. I've got a session ID. I've got the working memory. The working memory tells me which kind of like what's the state charts registry key, but the code of it isn't there, right? The data structure isn't there. So this just gives it a join point. This is just you saying here's how I'm keeping track of the state charts in my system and because I can define them in any namespace. Um, right? I I'm not going to go scan all the name spaces for the state chart. I just need someplace where you stored them. So, you typically just use the predefined atom based registry uh and register them.
+
+Host: Yeah, I understand. Um there is I don't know there's this other protocol that has this um load method.
+
+Tony Kay: The one the data model. Yeah.
+
+Host: Yeah. The data model. So like uh is that loading the registry or the
+
+Tony Kay: No, no, no, no, no, no. This is to populate the data model of the state chart. So the state chart can store arbitrary data within it.
+
+Tony Kay: Right. This is where you can do an assign executable content inside the state chart to to put data in the state chart itself in the session.
+
+Tony Kay: Load data is is meant for initial state in the state chart. That's basically what it's meant for. I don't think we use it to be honest. I don't think we've used it for any of our state charts.
+
+Tony Kay: Um
+
+Host: um I'm still a little bit confused. So like when it loads the data, it returns the initial working memory.
+
+Tony Kay: Uh no no. So the so the data model is meant to store the data in the processing end right where the processing end is is an abstraction. Uh in our case well in all cases the processing end is going to have the working memory of the running session and all an implementation of all these protocols.
+
+Tony Kay: What load data is supposed to do is it's supposed to copy whatever source abstractly says. Could be an expression, could be a function for the processing model, could be right, you define it because you're defining the protocol. But the idea is whatever you've specified in the source that's declared on the data model element of the state chart needs to be copied into the data of the processing end of that session. It's an initialization. That's all it is.
+
+Tony Kay: I'm going to look at an example and see whether I can fully understand it. I'm still getting confused between this and also the
+
+Host: So, so when when I what we got to Why didn't that let me draw? There we go.
+
+Tony Kay: Um, we have we have the state chart definition,
+
+Tony Kay: right? And so this is the rules to move from state to state to state in a system, right?
+
+Host: Yes.
+
+Tony Kay: We have any number of instances
+
+Tony Kay: that all kind of point to that definition and say I'm a running instance of these and these each have a configuration.
+
+Host: Yes.
+
+Tony Kay: Right. What states we're in. They also have data. Sort of think of like class and instances. Right. This is the class.
+
+Tony Kay: This is an instance and an instance of a class can have private data.
+
+Tony Kay: That's what data models representing. It's representing the fact that you can hold on to some data that's specific to your session and your session alone that these state definitions can put data into or pull data out of.
+
+Tony Kay: Right? It's just working data. It's like variables for the state chart.
+
+Host: Okay. And this session this session data is that what we are calling working memory?
+
+Tony Kay: No, working memory is the combination of both.
+
+Host: Ah okay.
+
+Tony Kay: Oh I see. So the combination of the definition with the session data.
+
+Tony Kay: Exactly. The com the working memory has the the pointer to the definition and the current configuration and the current working memory. That's what's or the current data set. That's what's in working memory.
+
+Tony Kay: Yeah, I see. I understand.
+
+Host: That help. So load data is when I start up, what data should I put in here?
+
+Tony Kay: That's really all it's used for.
+
+Tony Kay: And in the XML version of um state
+
+Tony Kay: charts, I believe source is a URL. You're telling it to load data from some URL on the internet or whatever, right?
+
+Tony Kay: Or it can be a file name like load data from this file.
+
+Tony Kay: Right? In closure that makes kind of less sense. It makes more sense for source to maybe be a map of data or right some data structure that you can just declare on this element.
+
+Tony Kay: But because I've made this abstraction, you absolutely could load a file or a URL or whatever. Source is completely abstract here. It's whatever you want it to be.
+
+Tony Kay: Okay, I understand.
+
+Tony Kay: Yeah. So that that that's part of the problem is by making it this abstract, it's hard to get your head around. Okay, what do I put there? Well, depends on what you define data model to be.
+
+Tony Kay: And um current data would be this session data.
+
+Host: Current current data is just the way your algorithms uh I didn't mean for to erase it read the instance data.
+
+Tony Kay: Yeah.
+
+Host: Right. This is get a particular piece of the instance data. This is get all of it.
+
+Tony Kay: All right. So preferably if you want to get All right. So we shouldn't like be looking into the working memory directly.
+
+Tony Kay: No, you really shouldn't. And and you shouldn't be using this directly either. This is something you could implement to provide a data model, but your state chart executable content is going to indirectly cause these to be invoked by the processing algorithm.
+
+Tony Kay: Yeah. Okay.
+
+Tony Kay: Right. So you're never going to you you well I won't say never. You could pull the data model out of the end in your state chart script like your script. The in has this data model in it. And so you could call any of these methods on that protocol. For example, update, right?
+
+Tony Kay: You could do an explicit update to the data model or an explicit get at to the data model, but you usually don't need to because the current data is plopped into one of the the elements of your
+
+Tony Kay: scripts arguments, your your lambda's arguments as a convenience.
+
+Tony Kay: And then the ops you return call update for you. So you don't have to.
+
+Tony Kay: So that's that's why you typically don't use this directly. It's something you could implement but it's something you don't typically have to call.
+
+Host: Okay. I I think I understand everything now.
+
+Tony Kay: Okay. Cool.
+
+Tony Kay: Okay. So anybody need a break? Bathroom break. Drink break.
+
+Host: Sorry. I have a I have a quick question. Yeah. just seeing the code in uh process synchronous event in that title.
+
+Tony Kay: Um yeah, deliver synchronous event. Um I know we have these uh session logs and with transactions, but I was wondering if any of these have any timeouts built into them.
+
+Tony Kay: With session lock has has definitely has a timeout. Um with transaction, that's the low-level SQL settings that you and I did, right? uh the the max time idle
+
+Host: in lock that kind of thing.
+
+Tony Kay: Yeah. So that's that's that was the cause of one issue. Exactly. A while back and I changed it by 30 or 60 seconds.
+
+Host: Exactly. Yeah. It was set to a day. Yeah.
+
+Tony Kay: I was wondering where that was. So
+
+Host: that was that was due to this with transaction. I think actually it wasn't.
+
+Tony Kay: Uh there's a there's a select for update and that's what was actually allocated to lock. over choosing the next event. Do you mean?
+
+Host: Yeah.
+
+Tony Kay: This is kind of sad. This used to not have the reddest thing on it because this with transaction and the select for update in the loop is supposed to
+
+Tony Kay: create uh what I needed with locks at the database level, but for some reason RDS in a multi-AZ layout doesn't always honor the lock, right? So, I had to add this red as crap around it. What was the question?
+
+Tony Kay: Yeah, sorry. Very quick question going on kind of Jeremy's stuff, right? Because I'm asking questions.
+
+Tony Kay: Do AI while I'm while you're doing this to catch up. So, the data model is like what we we use like ops assign to like
+
+Tony Kay: Yeah. Okay. Cool.
+
+Host: Yep.
+
+Tony Kay: Cool. Cool. Cool. Well, and and here here's the even kind of to me the cooler thing is in the fulcro implementation,
+
+Tony Kay: the data model uh has both state chart local values that get normalized into their own table in the state map. Um but it also has operations that will work on the folk state map at its root level which gives you the actor and alias uh support. So the data model actually supports the idea of working with aliases that manipulate values of particular components in the state database. Right? So that abstraction came in handy in that sense.
+
+Tony Kay: Yeah, that that's a little bit abstract for me. I would have to see some code. Uh here I I'll so so when you do when you do uh one of these ops like like ops assign uh you're supposed to give uh I
+
+Tony Kay: forget exactly how this works but you're supposed to give a path and a value.
+
+Tony Kay: This isn't necessarily the the exact note of sign. I don't remember exactly what you do here. I think maybe you don't need the map. I think you just give it a path and a value.
+
+Host: It looks like
+
+Tony Kay: yeah I think you can just say yeah it's like uh user ID and ID. Yeah.
+
+Host: Yeah. Something like that. Right. Um
+
+Tony Kay: what I'm saying is the data model interprets these paths. So I can say oh well if you say folk state a that means the root level key and the fulcro map whereas this means local to the session
+
+Tony Kay: get it.
+
+Host: Yeah. So you're you can manipulate fullcross stuff with
+
+Tony Kay: Exactly. Yeah. So, so then if I put an alias in here where I say, well, the actor slashforms uh right and that stands for an ident and then this is UI busy.
+
+Host: Yeah. Okay.
+
+Tony Kay: Right. So now my data model abstracts away the idea of where that goes. Right.
+
+Tony Kay: I just don't even have to worry about it. It's just up. Yeah. On the form make the busy flag true. Right.
+
+Tony Kay: So you have Okay. So, but but you have so that vector thing though um is like a nested path because like what I'm base you can just put keywords too and I guess that's just flat like one level.
+
+Tony Kay: Exactly. You put a single keyword. Yeah. If you just put a keyword, then then you're saying I just want the the the root of the local
+
+Host: uh you know the local session data,
+
+Tony Kay: right?
+
+Host: So I I didn't know that like like Fulcro has state charts built in to it just by itself. It's not
+
+Tony Kay: no uh folk there the state charts library has a folk integration set of name spaces.
+
+Host: I got it. Got it.
+
+Tony Kay: Right. that have implementations of all of these. So yeah, if you go to the state charts library uh and and look at the integration velcro
+
+Tony Kay: uh
+
+Tony Kay: operations hook, right? So these are extended operations for like invoking a remote, associating via an alias, invoking a load.
+
+Tony Kay: Right? So I'm sort of this the the fact that it's all protocol based and you you've kind of got the ability to hook into all this stuff lets you define you know extend the the u
+
+Tony Kay: uh list of operations that you can return from an expression. And then if you look at the
+
+Tony Kay: trying to find where the installed state charts process events where's the it should be indef type here we go focal data model. So this is the data model implementation for the fulker integration.
+
+Tony Kay: Um, so here source is literally just a map, right? And the map just gets swapped into the local data area of the session,
+
+Tony Kay: right? Um, and then we force schedule a render current data, right? uh does this you know resolving aliases and getting the current state and that kind of thing. Get at looks at the path tries to figure out if the path says root then that means just local data. If it's a keyword all by itself then that's get that keyword from local data etc. This is just an implementation of the protocol.
+
+Tony Kay: Not not not too difficult at all. And then the update with a list of ops actually uses a multimethod so that this is extensible. you can extend the operations that are supported and the default just says I don't understand what you want to do and then the rest of them uh which are in this file as well uh like delete for deleting
+
+Tony Kay: a particular key in the path does the same path logic to figure out which thing to dissoc from where
+
+Tony Kay: Yeah.
+
+Tony Kay: And then I think if we look at other depth types, right, there's the working memory store, right? So this is just storing at a particular state chart ident right get in swap trivial like like really really simple and then the uh the event Q I guess isn't there is an external event Q I thought it would be in the same name space but maybe I put it over here.
+
+Tony Kay: Oh I reified it. So here's the event Q
+
+Tony Kay: which is using a real Q which oh is this just using the manual pulled Q and it starts an async loop on it.
+
+Tony Kay: I don't know where the loop is but anyway you get the basic idea.
+
+Tony Kay: Um,
+
+Tony Kay: That's good. We We've taken an hour to get through four slides. There were there were pent up pent-up demand for questions.
+
+Host: How many slides are there?
+
+Tony Kay: 60.
+
+Host: We scheduled lots of time, right?
+
+Tony Kay: Yeah. We need we need a cool down just to catch up on. So I guess we're going to slide that.
+
+Host: Yeah. Yeah. Some a lot of these questions that you've asked will make a lot of these other things go fast.
+
+Tony Kay: Okay. So event matching this is the next important thing to understand.
+
+Tony Kay: Okay. So first of all uh the event names are meant to be hierarchical. So I mentioned a moment ago that that in the focal focal li focal logic library slash counts as a tokenizer.
+
+Tony Kay: Uh but the the basic idea so this should be dot and slash.
+
+Tony Kay: Uh the basic idea is that an event matches uh if the transition if the transitions you know event value
+
+Tony Kay: tokens uh uh include what the incoming event lists. So if the transition says error then that matches error error.end error.s send.failed error.s send/failed uh etc.
+
+Tony Kay: If the transition event says error.s sendin, that does not match an incoming error event. So, it just kind of makes sense, right? You've got you got this idea that a transition can handle more specific kinds of errors
+
+Tony Kay: um uh
+
+Tony Kay: as a default, right? Kind of as a fall through.
+
+Tony Kay: And then here, this was actually a bug in the prior version. So if you're running an older version, this isn't true. But
+
+Host: uh uh the it's it's tokenbased. So error
+
+Tony Kay: does not match errors because the right it's it splits them at dots. Nico,
+
+Host: no. I I've seen like we also like in the seen like error dot uh star that star
+
+Tony Kay: also works as a wild card after The star acts as a wild card. Yeah. Yeah, that's a great point. Uh for for clarity, you can also specify it that way, but the dot star just gets stripped by the matcher uh on the transition. So, it's it's there for an it's there for beauty for you to sort of yes,
+
+Host: like make you really understand. I'm trying to match other things besides just error, but technically the state chart library will match without it.
+
+Tony Kay: Uh, so the asterics must be at the end.
+
+Tony Kay: It's going to be like in the middle. Correct. An intermediate token.
+
+Tony Kay: Correct. It's it's undefined if you put it in the middle. I I can't tell you what it would do. It would probably strip it, tokenize it, and yeah, it wouldn't work the way you want it to work.
+
+Tony Kay: Uh, it's only it's only suffix suffix based whatever. Uh, and of course, you can use colon star as uh I'll match on anything, but that's the same thing as an eventless transition. So you can just like leave the event off of the transition and and you'll get that behavior.
+
+Tony Kay: Okay. So that's how events are matched. That doesn't mean which transitions will go. That's just how event names are matched.
+
+Host: Yep.
+
+Tony Kay: Okay. Now I'm going to jump to parallel regions first because some of the other things we need to talk about you need to understand parallel first. And we already talked a bit about them. They're not really all that difficult, but there are a couple of tricky things here.
+
+Tony Kay: Okay, so the idea of parallel is you create what are what are known as regions. And a region is just it's just a state.
+
+Tony Kay: Um, and it's a state that's an immediate child of a parallel element. That's that's really what what the term region means. Region is just a child immediate child of a parallel element. That's a state.
+
+Tony Kay: All of the regions in a parallel element will be simultaneously active.
+
+Tony Kay: Another rule you need to remember is that if a compound state which is a state that contains other state is active then one or one exactly one of that compound states must be active.
+
+Tony Kay: And you can actually specify which one
+
+Tony Kay: with an initial. Go ahead question.
+
+Host: Uh I I I was going to jump into the configuration line. The last line.
+
+Tony Kay: Oh yeah, it's wrong.
+
+Tony Kay: Oh, sorry. Uh, yeah, it's it's not it's not got enough.
+
+Host: I thought it was missing app. Yeah,
+
+Tony Kay: it's missing app. Yes, thank you. It's missing app. It's also missing boss and it's also missing network.
+
+Tony Kay: I wasn't able to proofread all this. Claude actually generated for them this for me in co-work uh in in Keynote or in PowerPoint format which was kind of cool. Um so I hadn't had had a chance to go over everything of the fine tooth comb but I spent several hours just repromp not reprompting but refining.
+
+Host: Okay does that clarify?
+
+Tony Kay: Yes.
+
+Tony Kay: Okay. So a parallel doesn't have an initial because all of the states are active. All the immediate children are active. If initial isn't specified, it's the first state, first child state in document order. That's the default.
+
+Tony Kay: So couple rules there. You can specify initial to point to a state that you didn't list first as the initial. That's also good protection if you're doing silly things like moving forms up and down in the state chart and sort of reorder them and suddenly change how the state chart acts. Um because it is right
+
+Tony Kay: it is document order uh execution.
+
+Host: Okay. Now there's Go ahead. Uh, is it possible to conditionally only start a um a subset of parallel states?
+
+Tony Kay: Nope. They all start.
+
+Host: Okay.
+
+Tony Kay: There's there's a correlary to that, but we'll get to that in a second.
+
+Tony Kay: Or maybe the um let's say a person were to implement I don't know is it a processor? Can they do something like that? I'm just asking like theoretically.
+
+Tony Kay: No. So the semantics of a state chart are well defined. So the algorithm defines which of these states is active.
+
+Tony Kay: Um you could define a different algorithm that would do different things. Absolutely. That's pluggable. I wouldn't recommend it because you'd have to do all the research and thought about how how that affects things. You're much better off going with the the wellressearched well thoughtout multiples, right? I mean they they spent decades refining this so that it it represents all the possible things they could think of in terms of modeling systems.
+
+Tony Kay: Uh so it's it's usually a problem on the part of your understanding and simplification of the problem and not not a problem of the way state charts work.
+
+Host: Yeah. Yeah.
+
+Tony Kay: Okay. So when to use parallel versus compound? This is pretty straightforward, right? Compound states, that's the earlier, you know, hierarchical stuff we were looking at, are mutually exclusive. Um, they're nested. Uh, if you, if you have siblings, only one thing can be active at a time. Uh, transitions flow between them, right? So, that's pretty straightforward. You use parallel when you have truly independent things. Now, you could also ask, and this is a perfectly reasonable question, why don't I just define other state charts and just run separate sessions.
+
+Tony Kay: Um, and that's true. If things are completely truly orthogonal, you can just run different state charts, right? They're not going to interact with each other at all. There's also the thing we talked about earlier, invocations.
+
+Tony Kay: Invocations are serve kind of a sort of different purpose. Um but but when you want a single state chart to track multiple concerns simultaneously that's when you want peril. An example of this that we're currently actively using in the Brazil state charts or that actually it's the routing system that of the state charts library uh is the idea of whether or not uh a route is is well not not not busy
+
+Tony Kay: whether or not uh we should be showing the user a reason for routing failing for example a form saying hey I'm dirty right that should prevent routing and so So the the the actual action of routing is blocked by a conditional guard on the transition, a wildcard tople transition that catches all routing events. If something says there's things are busy, then that prevents route, but there's no user feedback in that. The state chart just enforces it, which is nice, right? You don't leave the dirty form. Uh because the state chart, right, with one line, uh you can structure the the state chart. Um where is it?
+
+Host: And that's a parallel state.
+
+Tony Kay: Yeah.
+
+Tony Kay: Right. So this this is a parallel node and it has two children.
+
+Tony Kay: The routes um uh are passed in. That's a whole separate thing. But then the routing inpost state is a state that basically has two things. either I'm not showing the user the fact that there's a problem or I am showing the user that there's a problem and if I'm showing it then the user can tell me okay I understand or I want to do it anyway throw away my changes
+
+Tony Kay: right pretty straightforward it's very simple little little region um and then the emitted routes uh
+
+Tony Kay: Hold on. Uh has
+
+Host: uh hold on. I'm looking for the top level uh con route star.
+
+Tony Kay: Oh, I thought it was here. Basically, the the uh routing system here emits a top level transition that has a cond on it that basically says if we're busy, we do nothing. Oh, it's right here. I'm stand I'm standing right on it. Right.
+
+Tony Kay: So, if there's a route to event and we're busy, record where we wanted to go and raise the show routing info.
+
+Tony Kay: So now that parallel region is now in the show state or in the non idle state, the open state, right? We've recorded where the user wanted to go. So if they click on the thing that says, "Yeah, go there anyway," we can go there. Um or they can just close the dialogue and we've we've blocked the route right with this condition with this one transition uh at the top of the routes.
+
+Tony Kay: Does that make sense? You see that?
+
+Tony Kay: So it's like one region the route region
+
+Tony Kay: is sending events to the routing info
+
+Tony Kay: region that is al that is a part of the
+
+Tony Kay: yeah so the whole chart is getting events like colon route to and then the the this is sort of like como ui you know foo form right that's the route you want to go to right that's the event that's coming in Um, and when you create
+
+Tony Kay: this, we're not using this particular thing in Tao except in Brazil. Uh, uh, when this when you generate the routes, it automatically generates a bunch of transitions for you that take these events.
+
+Host: Right.
+
+Tony Kay: Right. But we put those here. These are
+
+Tony Kay: the direct transitions. These are these transitions. So we put this one first
+
+Tony Kay: so that its wild card matches the the the thing and if the condition is true document order this is the transition that's going to go. So we block this transition from going because this one matches first.
+
+Host: Right. So this
+
+Tony Kay: that one doesn't have a target. So you're not changing to a different state.
+
+Tony Kay: Exactly. We're not we're not letting it move. We're not we're not moving from the state we're in because we want to stay on that route and the routes are defined as states in the state chart.
+
+Tony Kay: Kind of cool, right? I mean, this is why I wanted state charts as a routing system
+
+Host: because you can model these these global concerns that are typically kind of a pain, right?
+
+Tony Kay: Okay. And when you when the user wants to like force the routing like the routing input is going to say show and the user can just like force.
+
+Host: Exactly. Exactly. And that sets it up so that this busy condition will evaluate to false.
+
+Tony Kay: Ah
+
+Tony Kay: right. And this record failed route put in the local data model where you wanted to go. It put this event in there. It saved the event basically.
+
+Tony Kay: Right. Assign failed route as the event.
+
+Tony Kay: It just saves the event. So that when you force the route, it right the override route sets it up so that it sends the event and tells it force true in the event data so that busy can see that and say, "Oh, nope. I'm not busy." And we're just rescending the same same event.
+
+Host: Okay. Yeah, I was confused like why parallel regions for that, but it's kind of cool.
+
+Tony Kay: Why parallel regions? parallel regions because there's two separate things going on at the same time.
+
+Host: Yeah. Yeah. Exactly. Yeah. Yeah.
+
+Tony Kay: Yeah. I don't want to leave the form. The form still needs to be the route, but I need something that tells me I should be open and receive events uh to to react to to whatever the user wants to do.
+
+Host: Yeah. Yeah, wherever that was.
+
+Tony Kay: Yeah, I also get because we said like parallel it was like because two regions were truly independent but one is sending events to the other basically.
+
+Host: Well, all right. So, yeah, let's talk about what truly independent means.
+
+Tony Kay: They're independent in the sense that uh the the state of one uh doesn't doesn't depend on the other. So the fact that a form is busy uh isn't our our our our popup that
+
+Tony Kay: shows hey that was busy do you want to you know you've got unsaved changes. Yeah,
+
+Tony Kay: right. That's an independent concern, right? I'm just trying to notify the user I denied routing. And denied routing is an independent kind of thing from any given form. They're not connected in any way. I have a hundred different forms. Any one of them could say busy. Um, right.
+
+Tony Kay: Yeah.
+
+Tony Kay: And I don't I don't really need to know anything about that form state. All I need to know is that the condition of the system is somehow busy is true.
+
+Tony Kay: So, so there's always some kind of coupling, right? They're they're one system. So, truly independent doesn't mean they're they're un untied in terms of
+
+Tony Kay: interaction. So, for example, let's imagine uh you're trying to model in state charts uh uh um
+
+Tony Kay: an uh a boom box, right? That has a cassette player and a CD player and a whatever, right?
+
+Tony Kay: Um the cassette player and it's also got a clock, right? That show you what time it is, right? Uh you could model the clock and its buttons to set the time and etc etc as a parallel region running in the same boom box state chart and uh you know the the uh uh volume
+
+Tony Kay: maybe is a piece of local data with transitions that can move that data up and down and the cassette deck has a play and paused and right. So there's there's definitely things that can be happening kind of simultaneously in the same state chart that could some of which could be easily modeled as parallel regions.
+
+Host: Uhhuh. That's cool.
+
+Tony Kay: Also, it's it's it's possible that your parallel regions might want to respond uh to the same event.
+
+Tony Kay: Uh so say for example um
+
+Host: trying to think of an of a good example here. ah uh traffic lights, right?
+
+Tony Kay: You've got a pedestrian crosswalk thing for east, west, and one for north, south, and you've got the traffic lights for east, west, and north, south. Um, and you have some sort of timed events that are going to happen to say, "Oh, well, it's time to warn the pedestrians that are currently crossing that they should hurry up. We're about to change the light."
+
+Tony Kay: Right? And so uh uh you know that event causes just one set of lights right maybe the north south ones to start blinking. But then when you get the next event
+
+Tony Kay: uh that should cause the traffic lights in the other direction to turn yellow.
+
+Tony Kay: We get the next event, both the traffic lights should swap, right? Yellow to red, red to green. And all of the walk lights should swap, right? From blinking to, you know, stop and from stop to go.
+
+Host: Right.
+
+Tony Kay: Right. So it's a single event that happened at some specific time, but because the machine is in a particular state where those different things are parallel parts of that same state chart, they might all trigger simultaneously from that one event. What was the question?
+
+Tony Kay: Um I had to uh so you're saying like in parallel states like when there are multiple active states and you send an event, it's going to be delivered to each state. that. Yeah. And and that's where the rules for what transitions fire come in because it's not as simple as most people think. When you fire an event, uh you actually have rules around what transitions are enabled, what transitions are in conflict and therefore then what transitions run.
+
+Tony Kay: Um so yes, more than one transition uh uh can be active for a given event.
+
+Host: Okay. And um so um another trans
+
+Tony Kay: transitions do they always point inward or can it sort of uh points to let's say a parent or like maybe an uncle state like maybe a sibling of the parent state?
+
+Host: A a transition can point to anything that has an ID.
+
+Tony Kay: Uh okay. And uh let's say it points to outside maybe a sibling of the parallel states and let's say another event causes that state to then like is that possible cuz like it's exiting the parallel domain wherein not like you know not
+
+Tony Kay: well we'll talk about event processing here in a minute. I am going to get to all the semantics here because this this is part of my my goal is to is to teach
+
+Tony Kay: you what's going to happen.
+
+Tony Kay: But first I have to teach you what parallel states are and that they run in parallel right the regions run in parallel so you understand the terminology. So for here let's let's kind of keep it to just definition and we'll talk about execution semantics in a minute.
+
+Host: Okay.
+
+Tony Kay: uh transitions can have more than one target because of parallel, right? Because more than one thing can be active at the same time in in these child states. If I've got some transition and I've got some particular event that should cause multiple areas of a parallel system to change, I can
+
+Tony Kay: say that this particular transition should cause both the left ready and right ready to become active.
+
+Tony Kay: So target can actually be a vector. It can be a single keyword most the time right when you don't have parallel regions. But if you have parallel regions, it's possible that you might want to say what happens to multiple parts. You don't have to specify all of them, right? You could just have left ready and it would just move this one and this one would stay wherever it was. Um, but you can list multiple if you need to.
+
+Host: What will happen if we do a vector but it's not a parallel, there are not parallel children. to dig this compound states.
+
+Tony Kay: That should be a state chart compile error. Like it it shouldn't. If my validations are right, it shouldn't validate.
+
+Host: Okay.
+
+Tony Kay: But I'm not positive I have that validation in there. I'm pretty sure the processor would crash though if you did that. Not positive. Um I I can't I can't
+
+Tony Kay: claim to have fully tested that edge case.
+
+Host: Don't do it. uh it's not going to work right but yeah
+
+Tony Kay: okay um so discussion question in your in in in our codebase uh can we think of a couple of concerns that are currently modeled as compound stains but are actually independent and would parallel regions simply the chart claude wrote this I have no idea what the answer is so brainstorm with me modeled as composting
+
+Host: for those who are most familiar with the state charts and stuff.
+
+Tony Kay: Yeah.
+
+Host: Yeah. Let's see what Let's see what it thinks the answer is.
+
+Tony Kay: It's just a generic question. It has a question, but it doesn't mean in our codebase. It just means in general.
+
+Host: Um, right. So, if two concerns never interact via transitions or respond to different events, then you're going to be using parallel.
+
+Tony Kay: uh they do need to coordinate like only allow X when Y is in state Z, right?
+
+Tony Kay: Then that's the natural nesting uh of compound states. Um parallel is useful for things like this, right? Am I logged in? Right? That's a nice parallel region uh of of say a top level system chart. In fact, I think we're modeling it that way in Brazil, aren't we, Gabo?
+
+Tony Kay: Have we gotten to that yet?
+
+Tony Kay: logged in, not logged in, right? Uh you you could do that as compound, right?
+
+Tony Kay: And and in fact, you might uh you might do off as compound if you're trying to restrict say which routing states you can get to in logged in versus logged out. Uh then that might be a a compound
+
+Tony Kay: state might be better, right? because you could say these are the routes that I'm able to get to when I'm in the logged in state versus the logged out state. Now here's the only substates I can get to, right? Um network status is
+
+Tony Kay: one that might be good because that's kind of orthogonal, right? Say you've got a websocket and the websocket loses its connection. You might update the chart with right in a parallel region that's tracking whether or not the the websockets connected, that sort of thing. Um, okay, let's not harp on that too much.
+
+Tony Kay: Okay, so let's talk about this enabled transition concept because this is one of the most important concepts uh to understand that you may not already understand. Okay, so what makes a transition enabled? Um, so number one, the source state is active, right? So a transition isn't enabled unless the state it lives in, right? because transitions are placed as as children of state nodes are in the configuration. Note that definition though this this isn't this isn't the source state is a leaf and active. This is the source state is active. It's just in the configuration. Right? So that automatically gets you when you're in some atomic leaf state all of your parents transitions are active and in parallel right you can have multiple every one of the parallel regions uh is active along with all of the whichever leaves and and you know anything in the chain from there.
+
+Tony Kay: Um
+
+Host: now this is an important uh point in in
+
+Tony Kay: parallel uh each region independently
+
+Tony Kay: searches for transitions right so so you you're you're gathering up the list of all the active transitions that that it's kind of what I already said right it's in the current configuration if it's in the configuration it's transitions are available for for enabling it doesn't mean they're enabled It just means they're available. So this is the first step. Step one, find all of the the transitions that live as immediate children to states that are in the configuration.
+
+Tony Kay: Fairly simple algorithm to be honest. If you've got the state chart normalized, you just look for them, right? What states are in the configuration? Okay, what transitions are in those? Next, does the event descriptor match the event that's coming in? Okay, so remember our our our uh event matching earlier. What what does it mean for an event to match, right? So number two, the event matches that includes event lists. So if you didn't put an event on the transition, then condition two, you're good, right? So one and two, right? So now we have the list of transitions that are in states that are active that also match the incoming events name.
+
+Tony Kay: Three, the guard is true, right? So if there is a cond, if there's not a con, then it's, you know, obviously true. But if there is a cond, then we run it and see if it's true, right? So if all three of those are enable, if all three of those are true, then a transition is enabled, right? So all three must be satisfied. That doesn't mean they're going to fire yet. We have another step, but this is step one. Step one is pick all the transitions that are available.
+
+Tony Kay: right? That that that that seem like they match what we're trying to do.
+
+Tony Kay: Okay.
+
+Tony Kay: Then for each active atomic state, so atomic state in the configuration, right? So we start this is this is where you get sort of a bubbling behavior. So we start as deep as we can go, right? So we look through the current configuration and we find the leaves, the things that are just leaves.
+
+Tony Kay: If the transitions are on the atomic state itself, then we're going to select those in document order. So in other words, they're all going to fire, but they're going to fire in the order they they exist in the document, top down as you would read it, not nested order, not depth first or some weird thing like that. Literally, if you're reading it left to right, top to bottom, when you reach it, if you're first, you're first, right?
+
+Host: If and only if none match on a particular stomach state, then walk up to the parent and see if it has transitions.
+
+Tony Kay: Keep doing that until a match is found.
+
+Tony Kay: Right? The first match wins for a given atomic state. After you've processed all the atomic states, then remove conflicting transitions.
+
+Tony Kay: Right? So, we're not quite done yet. We have to talk about what a conflicting transition.
+
+Tony Kay: So, start with all the leaves. If something matches on that leaf, that's that's when you selected. You stop looking. If there's nothing on that leaf that matches, look in the parent.
+
+Tony Kay: If nothing matches there, look in its parent. Nothing matches there, look in its parent. If nothing matches, you're done. there's that that thing isn't going to have any sort of transition in the list. Right?
+
+Tony Kay: So, what we've done here is we've built a list of trans transitions that are enabled. Now, note that for the most part, uh if it's just a compound chart, this is where it simplifies. If it's just a compound chart with no parallel, there is only one active leaf.
+
+Tony Kay: And so, you can sort of think of it as bubbling, right? Did that leaf have a transition? Did the parent have a transition? Did that parent have a transition? Right? It's pretty simple.
+
+Tony Kay: But as soon as there are parallel things, then multiple atomic states can be active. And that's where you get this more than one thing can happen at a time.
+
+Tony Kay: Okay. Document order first match wins. We already talked about that. That's literally reading top to bottom. So in this one, I guess we've sent an error validation event. And what what configuration are we in? Did it tell us?
+
+Host: I guess.
+
+Tony Kay: Oh, I guess there's just Yeah, there's only one state. Yeah. Yeah. Okay. So, we're looking at these. We sent an error validation. Uh tries T3 first if guards falls to T4.
+
+Tony Kay: Then error.Validation. Yeah, that would be T1. Yeah, it's in document order. But in terms of the algorithm, this matches and this matches. Uh this does not match and this does not match because the events don't match. But there are two things that match. But because the general catchall is second, the list of two things that
+
+Tony Kay: match, uh T1 gets picked because in document order that's the first one found.
+
+Tony Kay: So this is how you can get kind of an if else sort of thing. I'll catch specific errors this way. and then catch the rest of them this other question.
+
+Host: Uh I got confused. Um so the event send is error.validation.
+
+Tony Kay: Yep.
+
+Tony Kay: But why does D2 matches if it's just better? I thought it was the other way around. If I send error, I'll catch error. And error.
+
+Tony Kay: Okay. Oh, the transition saying it matches error means it matches anything whose first token is error and error validation does match that.
+
+Tony Kay: Right? So remember the first step is
+
+Host: figure out which ones are are available.
+
+Tony Kay: So I'm in some single state. I got an error validation. This one and this one both match on the event matching rule.
+
+Host: Right. That makes sense. Uh but document order this one's first.
+
+Tony Kay: It's the one that that uh we we do right it's the one it's it's
+
+Tony Kay: right we've selected two
+
+Tony Kay: and then right we we have to do uh conflict resolution. So this is right this is the basic con conflict resolution is all right for a given set of transitions at a particular level the first one is the one that wins.
+
+Tony Kay: If we send a save so this is the second example. If we send a save event both of these match on event this one has a condition. So if the condition is true this one's the one that's going to go. If the condition is false this one has no condition. This one will go.
+
+Tony Kay: Makes sense.
+
+Host: Okay. Question.
+
+Tony Kay: Yeah. Yeah. So, basically the the tokenizer works in a way where like sorry uh if it were uh like let's say we were sending the event error only.
+
+Host: Yep.
+
+Tony Kay: And it would would only match T2.
+
+Host: Yep.
+
+Tony Kay: Okay. So, it's like it's kind of like the tokenization works on the event itself and uh can match the transitions like any transition that has um any of the tokens from the event.
+
+Tony Kay: in the order that they Yeah. Yeah. Exactly. They both get tokenized. You tokenize both of them and then you're looking for subpath matching, right?
+
+Host: Yeah.
+
+Tony Kay: Um but only in one direction, right? So the the you and it's meant for this fall through behavior. It's meant for exactly this case. I have something specific to say about this specific one and I just want to catch the rest of them some other way.
+
+Tony Kay: Right? So, it's sort of like try catch, right? Where you got you got the inheritance hierarchy, right? Catch exception info and then catch throwable, right?
+
+Host: Yeah.
+
+Tony Kay: I've got something to do for exception info and app everything else. Screw it, right? I'll bail.
+
+Tony Kay: That's cool. That's because I had that like I was that question was in the back of the mind ever since you talked about the tokenization. I was wondering how that works here. So, I'm glad you
+
+Tony Kay: Yeah, that's exactly what it's for.
+
+Host: Nice.
+
+Tony Kay: Okay. Um,
+
+Tony Kay: is there anything extra here to say conditions on guards? There is a special guard that's in the I think it's in the elements name space called in. It returns a lambda that just checks to see if if the state chart itself its configuration has this state in it.
+
+Tony Kay: I
+
+Host: I could have sworn some saw something else like a G or something somewhere or an N. I think just a capital N
+
+Tony Kay: is there more keywords more things like
+
+Host: that's the only that's the only
+
+Tony Kay: there's ah there's some convenience functions uh you can say on
+
+Tony Kay: right and all this is is a function that returns the same thing as transition but it's just it's got the idea that well the only thing you wanted to say was event and target so you just put the event name first and the target name second and it'll it'll write it's just a short hand.
+
+Host: Uh what else is there? There's a bunch of them. There's a choice. Uh this emits uh uh a sequence of transitions,
+
+Tony Kay: right? Um they're just convenience.
+
+Tony Kay: Uh they they aren't new kinds of nodes then they're not in the standard.
+
+Tony Kay: They're just in in my opinion cleaner ways of of writing the chart. So what choice does choice lets you specify and I think a condition. So you you put an expression here uh and then a target and then an expression
+
+Tony Kay: and a target um etc. Sort of like a cond. It has
+
+Tony Kay: essentially the same basic structure.
+
+Tony Kay: I'm sorry, as a CA sort of like a case or a cond, right? Um, and what this emits is a sequence of transitions using these rules, right? It puts con it puts the same event.
+
+Tony Kay: Uh, what's the full Nico? What's give me help me out here. So, the choice node has an ID,
+
+Host: right? So this emits
+
+Tony Kay: has an expression.
+
+Host: It emits a state.
+
+Tony Kay: Yeah, this emits a state that has a transition that is eventless for every one of these cons.
+
+Tony Kay: And then I think there's a final something like that or else. Yeah, you say else basically.
+
+Host: Yeah. Um, and this just expands to a state with that many transitions on it. It's just a shortand
+
+Tony Kay: one of the one of the in my opinion one of the cool things cooler things that I did in the state chart definition system. It's just a data structure but a uh this the top level thing that interprets the chart into a normalized data structure tolerates a node being a map or a sequence of maps. So you can write a function that emits uh a sequence of nodes and it'll it'll automatically uh splice them into the data structure correctly so that you can create these convenience functions for making your state chart cleaner which is how that routing system. Remember when we were looking at the routing system, there was that uh
+
+Tony Kay: um
+
+Tony Kay: that thing that was emitting the transitions
+
+Tony Kay: invokes direct transitions.
+
+Tony Kay: Right? This is a vector of transition elements with event names and target names from all the direct targets in the routing system and then that's just embedded in a vector down here.
+
+Tony Kay: Uh right there's a concat of an on entry
+
+Tony Kay: this transition and then these transitions etc etc. This just splices a
+
+Tony Kay: state into the state chart that has these children and so it makes it easy to to make customized nodes for the chart that aren't anything other than states and transitions and and such.
+
+Tony Kay: Question
+
+Tony Kay: um yeah so I didn't quite get what you said initially regarding this. Are you saying like currently the state charts library does the splicing?
+
+Tony Kay: Yeah. Yeah, it does it for you. So if you go looking for the the on Uh here this is just an apply of transition with event target and then the children that's it.
+
+Host: Okay. And
+
+Tony Kay: top level or is it only like top level splicing that it does?
+
+Host: It recursively walks the data structure.
+
+Tony Kay: Oh okay.
+
+Tony Kay: Right. So so yeah you can you can do yeah you can do sequence embedding in in the places where it makes sense to do sequence embedding like right here. Right. I'm making a state and then I can just drop a sequence of transitions here,
+
+Tony Kay: right? And we're fine.
+
+Host: Okay. And uh the choice is it like cuz I
+
+Tony Kay: saw you wrote expressions and not events. Uh is it like it matches on any events for the choice the example? Yeah, the point the point is what you're trying to do is is you've got a transition that targets this node and and it's a decision node. It's not meant to be stayed in. You don't stay in this state. You transition to it and then it fans you out to someplace else.
+
+Host: So any event is
+
+Tony Kay: Oh, all right. All right. So it doesn't even wait for an event. As soon as it transition here,
+
+Host: it transitions somewhere else. Yep.
+
+Tony Kay: Okay.
+
+Tony Kay: Yeah, because these are all event. So as soon as you enter this state so this outputs this as soon as you enter this state it runs the eventless transitions in it and right and there's a final transition that's your else node that will take you there. The only way it'll sit in this choice node is if you didn't have an else but that's not really what you use the choice node for. use the choice choice node for exactly this idea of um an event has happened but now I need to make a decision whi where do I want to go and writing it like this is not very clear like to the reader of the state chart you're like uh okay it's a state right it takes you a few minutes to figure out that this is just trying to make a choice and so I made a choice helper so then it's just really clear oh I'm trying to make a choice I go here and that makes me go somewhere else Yeah. And I get transitions without an
+
+Host: event as sort of like on entry scripts.
+
+Tony Kay: They're not on entry. Uh um they they fire whenever an event is firing. Um
+
+Host: as you mentioned, the choice is done immediately you enter the state.
+
+Tony Kay: Help me out here, Nico.
+
+Tony Kay: uh
+
+Tony Kay: like I'm trying to understand that like when you enter the node ID state is going to do the condition is going to go to that the question is the on entry
+
+Tony Kay: no he's right he's right I've said this I've said this slightly wrong the choice node is a node you sit on is that true
+
+Host: we usually use it like with a current state but it's just like the initial
+
+Tony Kay: like like in the subscription state chart uh we use the choice node uh to figure out uh uh where to go after some event has happened like for example a payment is received if I receive a payment I go to a choice node and the choice node checks to see if that fully paid their account in which case they go to the paid state or didn't satisfy their balance in which case they go back to the unpaid state right they still owe us money that sort of thing So yes uh
+
+Tony Kay: the execution of this choice node because it has eventless transitions uh it will transition immediately upon
+
+Tony Kay: uh upon entry.
+
+Host: Okay.
+
+Tony Kay: On entry itself is meant to run executable content.
+
+Host: Right? Executable content could raise an event that takes you somewhere, but executable content can't target you somewhere.
+
+Tony Kay: Yeah.
+
+Host: Right. So, a script node, an on- entry node couldn't move you somewhere else. A trans an eventless transition can.
+
+Tony Kay: It could if there's an event, right? If it calls an event.
+
+Host: Yeah. Yeah. Yeah. But that's that's that's that's an event. That's not a that's not a the state just became active
+
+Tony Kay: uh kind of thing.
+
+Host: Yeah.
+
+Tony Kay: Yeah. So this is sort of a special case that's designed into them for this exact there used to be if you look at the prior version of the state chart algorithm there used to be a node like this and they realized oh well if we have eventless transitions you can model that with state and transition we don't need that extra thing and so they eliminated it. So in older versions of state charts, this was a formal thing. And in the new version of state charts, it's it's a thing they realized you could do with sort of like sort of like the problems we've been having with with the RAD modeling, right? Where you do something uh specialized when in fact the generic already could handle the case.
+
+Tony Kay: Uh so um two more questions like if you don't want these transitions to be eventless so you you need to add an event uh event option and you know
+
+Tony Kay: in which case you wouldn't use the choice node right the choice node is is just meant to make it obvious that you're using eventless transitions to get this specialized behavior that's very useful. That's why I made a convenience. So why this name space is called convenience is there are things in here that just make it right like send after uh there's a send node but if you use the send node it schedules an event that is going to come to you no matter what even if you leave the state you're in most people what they actually want is a send that happens but only if I'm stuck in the state right um if I've left the state then I should cancel so this send after is a convenience that emits an on entry and an on exit that both schedules the event and will cancel it if you exit the state.
+
+Tony Kay: H yeah, there's there's all sorts of there's also convenience macros that help with
+
+Host: uh diagramming like there's a choice macro and what it adds in is uh uh sorry
+
+Tony Kay: what it adds in is uh a stringified version of the condition in this prop of the transition node so that drawing tools can draw this label on the line.
+
+Tony Kay: So if you've if you said like you know paid question mark as your expression then the diagram condition would be the string paid question mark and the diagram could show paid question mark on the line as its condition
+
+Tony Kay: right because it's a macro so it can actually you know pull your source code in as the format.
+
+Host: Yeah. Um I have one more question just establish the rules for the eventless transition. Mh.
+
+Tony Kay: So, um, if the first transition has an event option and then the others do not, like are they still eventless transition or
+
+Host: they're still enabled?
+
+Tony Kay: They're still enabled. So, so let's go back to the enabled rules. Um, uh, so transitions are enabled uh,
+
+Tony Kay: right? For if the source state, right, in this case, the source state is is the this choice node. the state that's a choice node um is in the current configuration there is no event so of course the event matches right because the event is optional and then cond guard is the only protector there so the only thing that keeps the transition from happening would be a conditional guard or an event so by putting an event on there because an event isn't there right well actually there is an active event it's the event that just fired that took you to the state from the other transition.
+
+Host: Right.
+
+Tony Kay: Right. So actually that that event is still technically the quote active event
+
+Tony Kay: and the state chart will continue evaluating transitions until it doesn't find any enabled. There's an internal loop.
+
+Host: Okay. I thought it only does one iteration then maybe.
+
+Tony Kay: No. Okay. We're getting that. until it's sort of like stable state. No.
+
+Host: Yep. Until you reach a stable state where there's no transitions that can be taken. That's exactly what happens. Yes.
+
+Tony Kay: Yeah. So, so yeah, you can have very complex sequenced uh uh things happen on a single event.
+
+Tony Kay: Yeah. Um I'm just thinking like I don't know cuz like I I I know that like state machines initially were to simplify some of those choice and condition complexity and uh state charts. I don't know when when you add in the parallel and all these trans transitions seem complex.
+
+Tony Kay: So there's there's two I mean this is an
+
+Tony Kay: interesting if you go read the Herell paper on state charts finite state machines have been around for quite a while. The problem you have with finite state machines is a state explosion problem. In order to model the the actual behavior of complex systems in a state chart, you get an exponential explosion of the number of states you have to have to to sort of encompass the behavior of the system. And what Herell realized was that very often these these state machines the state explosion people were naming things that their individual states states like checkout underscore
+
+Tony Kay: uh you know substate underscore substate like they were making these big long names for the state to stand for the you know um my power is on on the boom box
+
+Tony Kay: and the cassette deck is paused.
+
+Tony Kay: Right? And by by making them hierarchical, you solve that state explosion problem. You get a much smaller set of states that can model the system. But then what he went on to try to define was okay and he was working at the time I think with uh airline software like airplane software like this is back when there were you know uh uh trying to figure out how to write systems that were critical right software that that ran things like airplanes where people's lives are at stake and make it very clear how things worked. And so he wanted to be able to visualize uh the the the software system.
+
+Tony Kay: And so what what he was trying to design was kind of a feature complete system that could represent what was needed to model these complex systems as simply as possible. And that's what I love about them, right? You can you can model extremely complex systems in a tight com, right?
+
+Tony Kay: One of the things that we're constantly working with in software design is crosscutting concerns.
+
+Tony Kay: Uh being able to divide and conquer, right? Break our program up into pieces of logic, expressions, things like that.
+
+Tony Kay: But then composition, we need to compose systems in a way where we can understand them. So for example like our um our login
+
+Tony Kay: page into Tao when you log into our system uh you're running a state chart that's actually very big and quite complicated. It's got everything from password reset onboarding uh uh uh sign up
+
+Tony Kay: uh conditions around sign up handling uh social login like Google initializing the application preloading the application config making sure all that happens in order uh it's actually the use case that I ported state charts for because state machines weren't good enough um and I knew state charts were that that was the initial use case. I think actually the initial use case was subscriptions on our system, but I realized the the login startup it was constantly breaking. The logic was spread all over the place. There were mutations firing. The ordering was all screwed up. There was asynchrony you couldn't follow. It was a mess. But the complexity of the actual system was high. The it wasn't incidental. The incidental complexity was the fact that we didn't have a way to compose the system cleanly in a way you could reason about. But the real complexity of the problem was actually quite high.
+
+Host: Right.
+
+Tony Kay: So, so you the question is uh what's the minimally complex thing you can build that will let you organize a truly complex system uh but isn't missing pieces that don't let you model a part of it.
+
+Tony Kay: And that's what's beautiful about state charts from my perspective, right? is yes they've got some complexity to them but that complexity is there to to actually address uh real problems and if you look at the sequence of standards you can see Herell's first proposal got simplified by him that got turned into W3C spec that got simplified in one or two iterations like they actually were removing things it's like what's the minimum number of things we can have in here and still be able to do all the things you might need to do in a
+
+Tony Kay: Uh and the fact that you can get that down to state transition uh on entry on exit right parallel like like a handful of of nodes in a chart that can then be shown visually. I I think that's beautiful.
+
+Tony Kay: Yeah, I think I agree. 25 minutes ago, I literally asked Chat GBT like if airlines use this kind of stuff, like big ainers, and it said it does.
+
+Tony Kay: Yeah.
+
+Host: And like also like industrial system because when you when you go into like an enormous if you look at the cockpit,
+
+Tony Kay: I I I can't imagine how like what it would take to code all of that stuff that goes on other than, you know, something like this because you would just have conditionals everywhere and it would make sense.
+
+Tony Kay: Oh, it's a mess. And how would you test it? How would you debug it? Like it's just Yeah. It would be a complete nightmare.
+
+Tony Kay: Yeah. Like you you could just easily get the airplane into like some invalid states based on you know without something like this I think. So
+
+Tony Kay: yeah and this and this gives you something where you know you really can you can test the hell out of this right you can you can write tests that you know plug in these these expressions as as mocks and say okay when this particular condition is true and this happens we do this. All right when this part right and then test the expression. All right, does this detect it right? Does the signal what if the sensor is down? Blah blah blah blah, right? Um, so you can actually do exhaustive error analysis. Uh, and you've got these conditions that can be catchalls or the these events that can be catchalls, right? Like a transition, a transition, sorry, an eventless transition with a condition, right?
+
+Tony Kay: Fires all the time, right? anytime there's there's processing and its state is active. Um, uh, an event, the wild carding with tokenization gives you a way to catch things that you didn't expect, uh, or need a catch all for, that sort of thing. It's actually pretty pretty beautiful, I think.
+
+Tony Kay: Um, and it's why I've been pushing, you know, we we need to be using these more and more. Uh, to the point
+
+Tony Kay: Yeah. to the point in Brazil where it's like, yeah, the entire system can just be this. It's just state charts. We don't need anything else.
+
+Tony Kay: It's kind of funny that these didn't catch on more to be honest.
+
+Tony Kay: I I that's why I was just looking at the stars on your library. I'm like 116 that seems kind of like low especially for the closure community.
+
+Tony Kay: Yeah. No, it's it's
+
+Tony Kay: I I once went to read a paper because there was there's there's been a question for years. I forget when the paper was written. It's a long time ago. It's like why don't people why don't software systems in production like production software systems in the industry tend to use state machines and state charts. And it was a really good argument. They're like, "Well, you know, initially people think their system's going to be fairly simple and it's really fast and easy to just, you know, not think about it and just write your little expressions and cobble it together." And by the time you realize you need it, you have such a large hairball that with a whole bunch of like built-in things that you didn't think about that are sort of like if you change how they behave at all, you've got a bug that you're afraid to touch them. And so, you don't refactor them.
+
+Tony Kay: You don't you don't bring them in when you realize you need them because it's too hard. I think it's people just don't know about these things either. Even statement like
+
+Host: Yeah.
+
+Tony Kay: A lot of people like will just write literally nested if statements. Oh yeah.
+
+Tony Kay: For everything.
+
+Host: And then uh
+
+Tony Kay: and I've seen it. I've seen that with people and they don't they don't want to improve either. They don't
+
+Host: they don't see what they're doing as garbage.
+
+Tony Kay: Yeah.
+
+Host: It's all over the place.
+
+Tony Kay: I I think the um there is a closure state chart library the one I'd used um previously and uh it's it doesn't have a bunch of these kind of things like it's not really this like it's more so event driven you know you have your state and like I don't know
+
+Host: it's sort of weird
+
+Tony Kay: yeah Lucy uh Wang I think it is
+
+Host: I don't remember the author I think it's CJ state chart or something
+
+Tony Kay: yeah yeah she she wrote her library about the same time I wrote mine And actually, she had released hers just before mine. And I was like, cuz I went looking. I was like, I want state charts. I just need them. And and I looked at hers and I was like, no, this doesn't do what it needs to do. It's like loosely based on the spec and
+
+Tony Kay: doesn't let you plug anything in like this. This is not going to not going to work. And so that's and and then I found that the W3C spec, this was really nice.
+
+Tony Kay: Uh,
+
+Tony Kay: this was this was super nice. Uh, I went to read this and I was like, "All right, I should implement what this says because this is a standard. It's got all the semantics. If I implement what this says, it'll just be right." Uh, and uh
+
+Tony Kay: um I was looking through it and there's an algorithm. It's like actually got a pseudo code algorithm that's complete.
+
+Tony Kay: And so I wrote very if you look at the implementation in here it's it's a very imperative like Java like it follows this as close as I could follow it. Um the only thing I did to make to make it um more functional was I made it so that it wasn't it wasn't a closed tight tight loop. actually split this into you've got a pure function that does the steps on a in input state and then returns the output state and of course side effects happen as you go so it's not it's never purely functional because state charts can side effect um and so I had to break this main event loop this was the hardest part of it I had to break this main event loop into two because it says while running right no it's not while running I might have 100 threads running events So um so I had to break this loop
+
+Tony Kay: in kind of in the middle uh kind of right here right get an external event.
+
+Tony Kay: This this is the break point of the algorithm.
+
+Tony Kay: But other than that, the algorithm is is you know line for line as close to even reading identically to this as I could make it so that you could easily sort of debug it and and try to um like I I I
+
+Tony Kay: think I even named the functions. I may have closurized them, but I think I even named it like select eventless transitions and exit interpreter, you know, etc.
+
+Tony Kay: Okay, ready to continue?
+
+Host: Yep.
+
+Tony Kay: Anybody Anybody jumping up and down to go pee or something? We could take a five minute break.
+
+Tony Kay: Nope.
+
+Host: I don't have to pee, but I appreciate it. 5 minute break.
+
+Tony Kay: Okay. Yeah, let's take a let's take a quick break.
+
+Tony Kay: Back at back at the top of the hour.
+
+Tony Kay: here.
+
+Host: All right. Continuing.
+
+Tony Kay: I don't know if I don't know if everybody else um
+
+Tony Kay: top of the hour is being recorded. All right. Okay. So, there are two event cues. This is really important to understand. And so, this this goes to Jeremy's question around uh the the is just one event processed.
+
+Tony Kay: And the answer is no.
+
+Tony Kay: So, here's here's the actual loop simplified at the bottom. And the basic idea is you have internal events and external events. So external events you actually have an external event Q right?
+
+Tony Kay: So that's what that event Q if you remember from the protocols that event Q protocol uh is where you can put events that might have some say time at which they're supposed to fire uh or they could just be immediate. The way our event Q is modeled on the server side into Tao is you always put a time in there and the time can default to now. Right? I want I would like this event to go as soon as possible.
+
+Tony Kay: This right these delayed sends that you can define in a state chart and and and send manually things like subscription expires in a month. Uh that that's one of the primary uses for this external event cue. But really it's anything that's externally motivated. So the user clicks a button uh some server response arrives in a fulcro chart. Um another
+
+Tony Kay: chart sends an event uh to a chart. Uh all those are done uh uh via the external queue.
+
+Tony Kay: Internal events have to do with processing the chart itself. So the chart itself can have a raise element and the raise element actually puts uh this event on the internal Q. So there's another Q here just like the external Q there's an internal Q and it is a Q it runs in order uh and so you could have a raise which is an executable content on uh an element. You could transition to another element that does another raise and that would put another event on the internal Q. So the state chart itself can cause any number of events to be plopped onto this internal queue.
+
+Tony Kay: Uh when a child
+
+Tony Kay: state for example let's say a a region in a parallel chart reaches a final node that automatically internally fires a done state and the ID of the state event. So that that goes on the internal queue.
+
+Tony Kay: Uh if you've done an invocation, which is like running another start state chart and that state chart finishes and you're still in the invocation, you'll get a done invoke and the ID of the invocation event on the parent chart.
+
+Tony Kay: Uh, and then if your expression engine, your your processing, not the processing engine, but the part that runs your expressions receives say an unexpected exception, it'll automatically throw an error execution event on this internal queue. Okay, what was the question?
+
+Tony Kay: Somebody raised their hand. You're muted. Jeremy,
+
+Tony Kay: that was me. I I was muted. Yeah, I I want to better understand the done state and done in uh invoke events. So, are they like at the top level?
+
+Tony Kay: These are events. They're sent to the entire chart. Go back to the enabled transitions
+
+Host: and process.
+
+Tony Kay: Yeah, great.
+
+Host: Now, this is when um the done state like when exactly
+
+Tony Kay: we'll get to this. I'm going to we're going to cover this. Um
+
+Host: Okay.
+
+Tony Kay: Yeah. So these dun have to do with elements or or portions of a chart or or child charts in the case of invocation uh finishing reaching an end state.
+
+Tony Kay: Um and we'll get to when when that is.
+
+Tony Kay: So your internal processing loop right so back in the in the um example I was showing you a little while ago in our code uh into ta code right where we we say you know get where was it? Uh, synchronous
+
+Tony Kay: send synchronous event. There we go. Get working memory process event. Process event is what we're talking about right now. We're processing an external event that was just handed to us. Here's the external event. Get working memory, process event, write working memory, write working memory. That's basically the the thing. So this process event, this is the thing that's running this loop, right? So this loop processes any eventless transitions.
+
+Tony Kay: So if we're in here and there are transitions that are eventless and they're enabled, right? Their conditions are true, they'll run.
+
+Tony Kay: Then while the internal Q is not empty, right? So this guy has all these events that that are on it for whatever reason. uh pop event, do the select transitions to figure out which which ones are are going and then you know execute them basically, right? Figure out the conflicts, figure out the executable content, do all the stuff, right? And this is a loop. So until this Q is empty, it continues running the things on the internal queue.
+
+Tony Kay: And so the the the entry that we're saying, right, this kind of gets rolled to the top actually, right?
+
+Tony Kay: um is we accept an external event, select the transitions in micro step and then do this while loop and then we're done. So that's process that's where I had to break this loop up. Remember I was telling you a minute ago that that that large processing loop I had to break it into two pieces uh so that so that it wouldn't be this tight loop that that goes forever. So that's why this is simplified. Uh the actual processing is typically uh driven by an external event
+
+Tony Kay: that selects micro steps and then processes transitions does a loop until
+
+Tony Kay: everything stabilizes and the internal Q is empty then it returns then you can hand it one more external event etc.
+
+Tony Kay: Right? So you do the the the external event loop is external to this algorithm.
+
+Tony Kay: All right. So, internal versus external transition types. This one's really important. This this comes in handy um but can also bite you if you don't know it's there. So, the rule is for a transition with a
+
+Tony Kay: type specifier on it. This is optional.
+
+Tony Kay: And this is what it looks like. You just say type internal or external. The default is external.
+
+Tony Kay: If the transition is external and that transition fires, then the source state in other words the the state that this transition is located in as an immediate child. The source state will be exited. So onexit handlers will happen and re-entered. And so the on entry will handlers will run.
+
+Tony Kay: That's really important. If it's marked internal then the source state is not exited. So you won't get an on exit and on entry.
+
+Tony Kay: Now this whole thing about source state location is important. Let me let me see this. This answers your question. So hold your question for uh for this. So if I've got a state P, right? um and it's got a transition in it, right? The source state of this transition is P. If state A has a transition, the source state of this transition is A.
+
+Tony Kay: Okay. So if P transitions to self, so P transitioning it to self would be this transition. The source state is P and it transitions to itself.
+
+Tony Kay: Then by default it's external and onexit on entry handlers inside of this state will fire. So this guy pointing to itself which you can do I want to do some executable content and then re-enter myself will exit and enter.
+
+Tony Kay: If you put transition type internal on that transition and you get this event and the source state is P, it will not run the entry and exit.
+
+Tony Kay: If you're in A, the source state is A.
+
+Tony Kay: So if I go from uh the source state is A and I'm going to B, then P's exit and entry won't happen. Right? So so moving from A to B inside of here, even if it's an external transition because the source of the transition is A, A is the one that would have its exit entry called, not P's.
+
+Tony Kay: So that's that's kind of the important distinction. We do use this. We have state charts where the transition is explicitly marked internal to prevent onexit on entry from firing. And I think we even have some declared explicitly external even though that's the default just to make it very clear that we're we're intending for the entry and exit handlers to happen. Okay. So now what's the question?
+
+Tony Kay: Um I was going to ask whether like um all transitions can be triggered externally and internally or is it possible to limit a transition to only internal or external transitions?
+
+Host: No no no no this has nothing to do with that.
+
+Tony Kay: This has nothing to do with the event type.
+
+Host: Oh just
+
+Tony Kay: this is this is a marker on the transition to indicate how the transition behaves with respect to its parent its source state. That's it.
+
+Tony Kay: Events being external or internal have to do with whether they came from the internal queue or the external
+
+Host: queue,
+
+Tony Kay: right? Totally different concept. Unfortunate overloading of words,
+
+Host: right? So, this isn't I respond to an external event or I respond to an internal event. Completely orthogonal.
+
+Tony Kay: So, great question. I'm glad you brought it up. Uh uh same word, unrelated.
+
+Tony Kay: Okay. So remember I talked about conflict resolution earlier.
+
+Tony Kay: Uh one element of conflict resolution is just the document order. Right. I've got multiple transitions that enable and if right only one from an atomic state of those transitions uh that that matches uh will be taken in document order.
+
+Tony Kay: Um if there's an explicit match um for parallel regions uh you've got another possible conflict uh when their exit sets overlap right and when we say exit sets we're exiting the parallel parent right so so for example this state has a transition that would stay inside right it's going to maybe some you know target that's inside of panel A somewhere they haven't shown it here and panel B has an event same event which targets something outside of the parallel region. Well, this is a conflict. One's trying to completely stop all the states in the parallel system and the other is trying to do something in the parallel system.
+
+Tony Kay: Right? So that's a different kind of conflict. So if you have this kind of conflict then the transition that uh uh uh
+
+Tony Kay: the
+
+Tony Kay: deeper source wins and if that's a tie document order breaks the tie.
+
+Tony Kay: So in this case the panel A wins um not because it's deeper but because it's first right so both C reset they conflict because one wants to exit the parallel region and the other doesn't and to resolve the conflict uh either the deeper source so if this transition was nested three levels down it would win
+
+Tony Kay: uh even if it was down here in in panel B. So if it was deeper in the document, it would win. Otherwise, document order wins.
+
+Host: Follow.
+
+Tony Kay: What happens to the other transition that does not win?
+
+Host: This one just doesn't get selected,
+
+Tony Kay: right? Because this transition would force the whole thing out of the parallel region, which would cause the entire parallel thing to to be done.
+
+Tony Kay: Right? It wouldn't the parallel state wouldn't even be active anymore. Dashboard wouldn't be in your configuration. Panel A wouldn't be right. None of this stuff would be in your configuration if this one won.
+
+Tony Kay: And that's what creates the conflict is this one's trying to do something within the parallel state and this one's trying to exit the parallel state. That's the conflict.
+
+Tony Kay: Yeah, I understand that. I imagine parallel um uh the parallel regions are sort of spawning you know parallel actors. So then the actor that was on panel B like what what happens to it?
+
+Host: Does it like
+
+Tony Kay: there's no such thing as actors here? I don't know what you mean by actors. There's just states there's side effects and there's states that's that's what you have.
+
+Tony Kay: But but I guess like the final configuration will be just it stays on
+
+Tony Kay: panel B.
+
+Host: Yeah, it would stay in panel B.
+
+Tony Kay: Panel A in it.
+
+Host: Yep.
+
+Tony Kay: Yep. And that So you'd have dashboard panel A, panel A and it if that's some child, we assume and panel B.
+
+Tony Kay: I don't know if that was your question, Jenny. And if if the if the targets weren't here in any kind of conflict, like let's say there was executable content and that's all that was here. They just each had their own script element. They would both run because there's no conflict then.
+
+Tony Kay: So with no conflict, all of the parallels, they're all enabled. They all run with a conflict. One's trying to exit the parallel region, the other isn't. The deeper one wins. And if that
+
+Tony Kay: doesn't if they're tied then document order ones that's it. There's nothing else to it.
+
+Host: So a conflict is when it says there like
+
+Tony Kay: when one is target is outside and the other one is inside.
+
+Host: Yep.
+
+Tony Kay: And that's that's unusual. I mean I mean
+
+Host: if Oh that's a great great question. If both was the question
+
+Tony Kay: if both leave if both are leaving the parallel.
+
+Tony Kay: Uh that's an interesting question. I don't know.
+
+Tony Kay: So you're saying if both said if both said something we're we're leaving.
+
+Host: Yeah. Let's say one.
+
+Host: Yeah. Log in.
+
+Tony Kay: I I'm I'm I'm guessing that that's still a con conflict, but the document order wins.
+
+Tony Kay: Okay,
+
+Tony Kay: the semantics are really solidly defined by that algorithm. It'll behave the same. It's not going to behave erratically. Um, and document order, I can just tell you in the spec, document order is like the king. If I can't decide what to do and there's a question of what to do, document order. Like that's that's what and and since this can't possibly uh do both if if logged out and logged in are two different states in a
+
+Tony Kay: compound section of the chart they both can't be active at the same time. So that would be I guess that would be another conflict. Um but but yeah I didn't write all these slides so I'm I didn't think about that that case and so I'm guessing I don't know for sure. Okay.
+
+Host: It it would be a silly chart to write.
+
+Tony Kay: So I would hope that you wouldn't write it.
+
+Tony Kay: Yeah. I'm seeing that with all this state library like you have a like a like a ton of possibilities of things to do or like if you want to achieve something you have
+
+Tony Kay: a ton of ways of doing it. So
+
+Host: yep. So, so Tony, not pictured here is like a a different state on the same level as the parallel ID dashboard called login,
+
+Tony Kay: right? Yeah. Yeah. That's that's like we're we're we're the slide was right getting too big. The idea here is you've got a state down here.
+
+Host: Yeah. I was confused for a little bit because I was listening to you talk and
+
+Tony Kay: Yeah, that's that's the idea. And then and then inside the stays inside we have we have some we have like a state within this state.
+
+Host: Okay.
+
+Tony Kay: Exactly. That's that's the ID. Yep.
+
+Host: Yeah.
+
+Tony Kay: I guess you guys were just using your imagination while I was confused.
+
+Host: Crazy.
+
+Tony Kay: Can there be a direct transition under parallel?
+
+Host: A direct like states.
+
+Tony Kay: I don't know what you mean.
+
+Host: Like uh the direct children of uh parallel the parallel node
+
+Tony Kay: parallel is a state.
+
+Host: Yes. Okay.
+
+Tony Kay: It just has a Yes, you can do that. Yep.
+
+Tony Kay: You can have on entry, on exit, transition. Yeah.
+
+Host: Okay.
+
+Tony Kay: Yep.
+
+Tony Kay: The the docu the documentation is really good and clear on this. So if you if you do the W3C state chart, you know, uh uh
+
+Tony Kay: document here and you just pick a node uh like parallel, uh it tells you what attributes it takes and then what children it can have.
+
+Host: Okay, cool.
+
+Tony Kay: And I'm trying to figure like if there is a transition like um are all states still active?
+
+Tony Kay: I don't know for
+
+Tony Kay: it depends on what your transitions do. That's a great question and that's a that's coming up. That's actually a really good question. We'll we'll we'll do that soon.
+
+Tony Kay: Okay. Um what if one region has no matching transition and the search walks up to the parallels parent? Okay. So, right, we have this idea that there's a transition up here that can catch a particular event. Um and we say shut
+
+Tony Kay: down. And so we've got, right, these are both active. There's nothing there. The walks up, right? The algorithm says go to the parent, go to the parent, go to the parent, and then run the transition in in question. Um, so there's no match, no match, walks up the app, binds the transition. Same for panel B. Both select the same transition. Uh and the result here is we end up exiting the entire parallel uh chart and we go to off.
+
+Tony Kay: Is that true?
+
+Tony Kay: Oh yeah. Yeah. Yeah. It would be it would be true here. Yeah. Yeah. Yeah. Because because parallel is a child of this state, right? And so we're saying that that there's a a sibling here. Uh for some reason the font is coming out the wrong color.
+
+Tony Kay: It didn't do a very good job of putting other things in here. Right? So, if I send an event and there's a transition here in the parent of the parallel, right? The the event is seen by these states. But if it walks out of the parallel region, finds a matching transition that takes it somewhere else, then the whole parallel like exits, right? You're done. All the onexit handlers will happen and all these all these will stop. Um,
+
+Host: right.
+
+Tony Kay: And if it's only one is the same conflict issue as the previous slide slide
+
+Host: only one.
+
+Tony Kay: It's not a conflict then, right? If I had a transition in here for event shutdown to run some executable content or something, that's fine. It'll handle it. It'll just stay in that state. The other one will stay in its state. You're fine.
+
+Host: Yeah.
+
+Tony Kay: Right. The reason I had it generate this slide, I remember when I made this two weeks ago, so I remember now I I wanted this slide to be there because of the enabled transitions thing. walks to parents. And what happens if you walk out of parallel and hit a transition and and right if you hit this transition, that's the source state. There's the target. You're no longer in this guy. And if you're no longer in that guy, you can't be in any of its parallel sub regions.
+
+Tony Kay: It's kind of obvious when you think about it, but it's it's one of those things where it's like, oh, all right, that that could be unexpected, right, if I'm not paying attention.
+
+Tony Kay: So, I'm I'm a little bit confused like how isn't this a conflict because one of the states has a transition and the other states has nothing to transition to.
+
+Host: Ah, remember that. Oh, wait, wait, wait.
+
+Tony Kay: You're right. You're right. That is a conflict. And this is the deepest, so it would win,
+
+Host: right? Because this one's way more shallow. So, this is the deepest transition.
+
+Tony Kay: Um, I don't know. Like, okay. So
+
+Tony Kay: you're right. You're right. It's a conflict because all states do evaluate the event. This one would still walk to here and enable that transition. This one would walk to here and enable that. Those would be the two enabled. They'd be in conflict because this one causes the parallel region to be exited, right? And this one doesn't.
+
+Tony Kay: Yeah.
+
+Host: And therefore it would select the deepest. And and that makes sense, right? You'd want the deepest rule to keep the parallel region alive.
+
+Tony Kay: go ahead Jeremy. I will ask something.
+
+Host: So like I'm still trying to wrap my head around because I've always been thinking about parallel state as parallel actors
+
+Tony Kay: but like it seems it's simply like okay there are multiple active states and you can run multiple transitions for that state
+
+Host: and if there's a conflict you simply do not run any transition for that. you know the inferior the other states that lost.
+
+Tony Kay: Yes.
+
+Host: Yeah. So be careful in in interpreting parallel to mean like threads. There are no threads here, right? There's there's no threads.
+
+Tony Kay: There's there's an algorithm running the chart and the and the algorithm is just that loop. It's one thread. There's only ever one thread. Unless you spawn threads in your expressions, you could do that. But the as far as the state chart interpretation goes, there's only one thread. And so when you say parallel, all you're saying is these things will be in the configuration in parallel,
+
+Host: right?
+
+Tony Kay: That's set because think about it. The the only thing that the state charts actually tracking over time is the data model which you use in your expressions for things like guards and what set of states are active. That's it. That is the complete data set of the entire state chart system.
+
+Tony Kay: what state you're in.
+
+Tony Kay: So when you fire an event, all the state chart algorithm is trying to do is decide which executable content to run and which states to end up in.
+
+Host: That's it. That's all it's trying to do. It's actually way simpler than I think you're making it in your head.
+
+Tony Kay: Yeah.
+
+Host: Yeah, I think I I get it now.
+
+Tony Kay: Okay.
+
+Tony Kay: All right. Uh mixed match. What if we inside has to walk up the parent? We just did that, right? Uh stays inside exits conflict panel a sources deeper.
+
+Tony Kay: Yeah. So we figured that out on our own.
+
+Tony Kay: Um ah now here's the fun.
+
+Host: I have a question. Yeah. On the the one before like what if the transition
+
+Tony Kay: the pattern transition has a a script is going to be run just one?
+
+Tony Kay: If you had
+
+Host: only enabled transitions run.
+
+Tony Kay: Yeah.
+
+Host: If there if you had this case this guy's a conflict and it would be thrown out.
+
+Host: So his executable content would run
+
+Tony Kay: because let's say you don't have the one inside as it was at the beginning.
+
+Tony Kay: Oh well then there's no conflict. You exit the parallel state and yes the executable content here would run as would things like on exit.
+
+Tony Kay: H the impacts only run once. My question was like there are like two states and
+
+Tony Kay: ah no no no yes it's it the transition is what enabled is enabled it's not related to the states the states are exited so if they have onexit handlers those will run these will all run
+
+Host: right
+
+Tony Kay: okay
+
+Tony Kay: so you you can have a whole bunch of crap happen as you exit but that's executable content on the states the transition is a transition.
+
+Tony Kay: Okay.
+
+Host: Yeah.
+
+Tony Kay: Got it.
+
+Host: So as you as you traverse this edge, you run its executable content. Now it could target a different set uh of parallel
+
+Tony Kay: states in a different parallel region
+
+Tony Kay: and all of their on entry handlers could run, right?
+
+Host: Yes. So you could have three on exits happen and then the transition happens and then two on entries happen, right?
+
+Tony Kay: There's a whole bunch of whole bunch of stuff that can happen.
+
+Tony Kay: This this executable content could include arrays uh that adds another event to the uh internal event queue that's then gonna going to be right done after all of that mess happens, right?
+
+Tony Kay: I I didn't quite understand like um if there are two active states and then they exit the parallel does the on exit
+
+Tony Kay: run twice
+
+Host: no no no
+
+Tony Kay: once this so so these run in inverse depth order uh panel panel let's see now which way will go a little deepest in document order so I think this one on exit will run it's well defined this one will run then this one will Um I think then the transition executable content runs
+
+Host: uh then as you're entering the states then you'll get the executable content of those states in document order etc.
+
+Tony Kay: I like it.
+
+Tony Kay: Yeah, you do not get arbitrary execution order and you don't get duplicates. Right. This this onexit isn't run once for each of these children.
+
+Host: It's exiting this guy. Right.
+
+Tony Kay: Yeah.
+
+Tony Kay: So you won't get duplicate runs and you won't get random order. You'll get a very well- definfined order.
+
+Host: Yeah.
+
+Tony Kay: And I'm pretty sure if I remember right, I'm pretty sure the entry order is um
+
+Tony Kay: document order outer in and exits are kind of the opposite. It's still document order but inner out, right? because you're it's as if you're exiting the innermost states first and then exiting their parents and then exiting their parents, etc.
+
+Host: Okay.
+
+Tony Kay: Yeah.
+
+Host: Sorry, I was allowing Jeremy to talk about actors, so I had a question this entire time.
+
+Tony Kay: Okay,
+
+Host: go back one.
+
+Tony Kay: Just go back to that example that we we were looking at.
+
+Host: This one?
+
+Tony Kay: Yeah. Yeah. Yeah. Yeah. Yeah. This one.
+
+Tony Kay: So, so basically like we were before you had uh this like the second thing the transition event shutdown within the dashboard
+
+Host: uh let's say right
+
+Tony Kay: uh if if the event shutdown arrives
+
+Tony Kay: that would would that only uh trigger the the within the parallel state dashboard if dashboard was in the configuration.
+
+Tony Kay: Correct. Correct. The dashboard has to be active for for any of these states to be active for them to be looking for active transitions,
+
+Tony Kay: right? And so if dashboard is in the configuration
+
+Host: and and and
+
+Tony Kay: would would app be as well like implicitly because
+
+Host: app is in app is definitely in the configuration.
+
+Tony Kay: Okay. Okay. So then it then walks right up and then hits the that shut down.
+
+Host: So you're saying if there's a transition here
+
+Tony Kay: Yeah. Yeah.
+
+Host: Yeah. And then I'll go to that target.
+
+Tony Kay: And then if uh if dashboard was not in the configuration, it would just go straight to app and look for that transition for shutdown.
+
+Tony Kay: Well, it depends on what these other things have in them, but yes, it it right if that's if that's the only place that shutdown's defined and whatever you're in at whatever level, you'll end up walking up to it.
+
+Tony Kay: Yeah. And that's just that again that just goes that's why this was so early in the talk. What makes a transition enabled?
+
+Host: Yeah.
+
+Tony Kay: Right. that you when you go to find process and event you look for all enabled transitions. You literally look at the entire chart for these three things and then selection right is is this sequence
+
+Tony Kay: and then conflict resolution is the other bits that we've been talking about.
+
+Tony Kay: So one minor thing we're talking about like invocations about like calling different state charts and then you have like a rays
+
+Host: is that kind of like a similar thing
+
+Tony Kay: because a state chart calling a state chart and then you have the rays going to another state
+
+Tony Kay: and raise is always it just puts an event on the internal queue which then walks that this this loop we talked about for the for those right you have an internal event cube all raise does stick something on that cube it's all it does invocations are whole different thing. Not even not even two those yet.
+
+Tony Kay: Jeremy is stabbing his hand.
+
+Host: Okay.
+
+Tony Kay: Yeah. Yeah. Um I think we need to can we go back to the other parallel screen?
+
+Tony Kay: Last one. Uh okay. So now um if we are in the parallel states and panel A and panel B are active then an event causes panel B to transition to panel A that means that there's now only one active states and you can never get two active state out of that. Is that correct?
+
+Host: Like panel A and panel B are active.
+
+Tony Kay: I hear you. I don't know that that's a valid state chart construction.
+
+Tony Kay: Um,
+
+Tony Kay: right. If you're if if you're wanting to exit a child state of a parallel child region, basically a state that's an immediate child of a parallel element.
+
+Tony Kay: Uh, you use a final node within that state. Uh, you can transition out of the parallel.
+
+Tony Kay: But your question of if I transition from one parallel region to a different parallel region, does that cause me to exit?
+
+Host: Yeah. Is it sort of like one of them exiting? Like let's say basically two uh
+
+Tony Kay: I I can't answer the question, Jeremy, because I I've never considered trying it because that's not really what parallel is meant for. You're not meant to treat them as compound sibling states that can transition between each other.
+
+Tony Kay: Uh I don't know if the validation would catch that and tell you it's an invalid chart. Uh it may be a use case I didn't think of in the validation. Uh and it could be that it's valid technically under the semantics of the standard and I'm just not aware of what it should do.
+
+Tony Kay: See I can't tell you. I can't tell you what it would do. You shouldn't do it but I can't tell you what it would do
+
+Tony Kay: in general. We shouldn't like you know design our stuff such that you know one of the parallel states can you know transition into another like you know they can meet at the same we should avoid that basically.
+
+Tony Kay: Okay.
+
+Tony Kay: Right. It's it's undefined in the semantics of the construction like the whole point of parallel is that all of the siblings with who are immediate children of the parallel are are all active simultaneously. Now, I'm about to talk about them becoming inactive independently because that can happen. That's actually allowed. Um uh but but I've never thought of trying to do it by what you just suggested
+
+Tony Kay: because there's a formal way of doing that, like leaving or exiting a one of these child states, just one. There's a way to do that that's official. Um what you're suggesting to do is nonsensical and shouldn't validate, but I can't I I can't guarantee that it won't.
+
+Host: Okay. And that's
+
+Tony Kay: right. So final is the node that we're interested in. So So state charts in general, like when you draw them, you've got like a a node that's like your initial entry point that takes you to some initial state, which can have substates, right? And you can transition amongst these substates or you can transition to some other state which might have substates and all of this could of course live in some bigger compound state etc.
+
+Tony Kay: Um a state chart can finish right and that's usually modeled as like a termination node that you can an event can transition to that basically means this state chart's done.
+
+Tony Kay: Um and when a state chart's done then its session is cleaned up. you if you try to send more events to it, it just does nothing. It's like dead. Um, right?
+
+Tony Kay: You're done with that process. State charts don't have to have a final state, right? Some state charts like our subscriptions, they just run forever. They're either paid or unpaid. They're active or inactive. They just keep going. They never end. U, but it is possible for a state chart to end. And it's also possible for a parallel sub region of a uh of a state chart to have a final node. This kind of final node is a final node within the parallel region.
+
+Tony Kay: It doesn't terminate the entire chart.
+
+Tony Kay: So, so this would be a final node uh at the very top right of the chart.
+
+Tony Kay: Actually, this final technically if I had a compound state like that, there could be another state over here. Um and and this one reaching final doesn't necessarily exit the chart. particularly for example if this was parallel that kind of thing right so uh uh the final node doesn't mean the state chart exits it means this is the final node in some particular region of the chart this is particularly important for parallel regions because this is what allows you to potentially exit right have task A drop out of the configuration separate from task B. So it is possible in this parallel region to see task A and task B or just task A or just task B
+
+Tony Kay: if final has been reached.
+
+Tony Kay: Right? So before I before I take the question, uh the basic idea here is um uh you do get an event when this happens. When you enter a final state of some region, that's where you get the done event that we talked about earlier in the internal event queue. If you reach this, you'll get a done. So you could put a transition on here that catches the quote done event and right does something. Um uh if all of the regions in this final have exited, then you will have gotten a done event for each one of the states.
+
+Tony Kay: Processing could technically still be the the active state if there was no transition out of it. It's just none of its children will be in the configuration.
+
+Host: Okay, what's the question?
+
+Tony Kay: Uh you literally just answered it. I gave every
+
+Tony Kay: Yeah. Yeah, let me let me finish the slide before raising your hand. Um, okay. So, that's the idea there. For most of our use cases, it's it's rare that you'll, you know, you'll do this sort of thing. Typically, when you have a parallel region, it's because you want, you know, something to kind of run forever and something else to kind of run forever within your chart. That's most of the use cases that we hit. But, it's it's important to know that this is a possibility just in case it comes up, right? This is all about having the tools in your toolbox.
+
+Tony Kay: Um, and so here's the the done state events.
+
+Tony Kay: Um, so complete chart exit requires a top level final like this, right? So this top level final will cause the entire working memory and entire chart to be garbage collected. If you've not reached this top level final state, then the the the chart's still technically active. You can still send events to it.
+
+Tony Kay: uh it'll still try to react. Um
+
+Tony Kay: so you could have parallel going here with a final and a final, right? And when when these exit, so tasks, where we at? So parallel tasks. Um oh yeah, I forgot about this. Sorry, I I said one thing wrong. If all of them exit, then this top level state also exits and sends a done event. So done state tasks means the parallel region all of its things have finished.
+
+Tony Kay: That won't exit the chart. But if you add a transition for that particular event that takes you to a top level final, that will exit the whole chart.
+
+Tony Kay: Right? So when you reach this state, you get a done state task A event, which we're ignoring in this example. If you reach here, you'll get a done state task B event, which again we're ignoring in this example. um and then both are final
+
+Tony Kay: then you'll get a done on the parallel and then that lets you transition uh some other way whatever it might be
+
+Tony Kay: I I guess it's impossible to have an outside transition that caches the down state of one of the regions because of the conflict that's like impossible right
+
+Tony Kay: uh no there's no conflict if there's no transitions in for it then there's no conflict. I mean it depends on what the transition does. If the transition tries to transition it out of the chart and a different one tries to keep it in, then there's a conflict. No, none of the rules have changed.
+
+Host: Yeah.
+
+Tony Kay: Right. You can put a handler for done state task B or A anywhere in the hierarchy and it will be an enabled transition.
+
+Tony Kay: Whether or not it fires depends on conflict resolution. So it depends on what it does. If it catches the event and just runs a log statement, it'll run. It'll log, right? But if it has a target and the target causes a conflict, then it won't run, right? Uh if there's an internal one that that overrides it that stays inside.
+
+Host: Yeah.
+
+Tony Kay: Okay. Uh
+
+Tony Kay: ah this is a good point. I didn't remember this. I'm glad this is here. When one side of a parallel is final and the other isn't, the final state is in the configuration.
+
+Tony Kay: So this isn't this is right. Final is just a state with an ID. If you don't give it an ID, it'll generate one, right? And if you generate one, then you won't be able to catch its events and you won't understand what that event, what that state is in your configuration.
+
+Tony Kay: Um
+
+Tony Kay: but the the finished until you're out of that parallel state completely um uh you'll have the the final state ids in the configuration.
+
+Tony Kay: Okay, we've had a lot of discussion so I think I'm going to skip the discussion.
+
+Tony Kay: We got got a decent way to go still and uh a lot to talk about. Uh and there are exercises.
+
+Tony Kay: Okay. History
+
+Tony Kay: poof. This is taking a lot longer than I thought it would, but it's good. Good. We're having lots of questions. I feel like everyone's kind of getting a better understanding.
+
+Tony Kay: All right. History nodes are about remembering where you were in a compound state that you've exited during the session.
+
+Tony Kay: Um, so example multi-step wizard. So let let's say you take someone to a route and they're walking through a multi-step wizard and they get to step three and they're like, "Oh crap, I need to go fix my profile." And they go and fix something in their profile which is a different route. And they they're like, "Oh, right, right. I need to finish setting up my onboarding or whatever. They come back to the wizard. It might be nice to put them back in step three.
+
+Tony Kay: They've already finished one and two.
+
+Tony Kay: You can do that in two basic ways. Uh way number one, which we do in the subscription state chart intentionally, is we don't use history.
+
+Tony Kay: uh we actually examine the state of the system and try to figure out where you're supposed to be through logic. We do that so we can restart the state chart and have it pick up where it left off according to the database.
+
+Tony Kay: The reason for this is because we side effect invoicing and payments, right? So I don't want it to remember that you're in a paid state if I have to restart you. I want it to look to see if your invoice got refunded, right? I want to see that it puts you in the state that actually matches the state of the real world.
+
+Tony Kay: So, history is meant to make the state chart track where it was when you left a compound state and then came back. Um, but it's optional. You can add it in and it's a special node you add. And that history can be either deep or or or shallow and we'll talk about what that means, but that's that's kind of what it's meant to be. It's actually implemented in a very simple way. It's just kind of memoizing uh uh the substate you were in in a state uh so that if you go to the history node, you'll reenter that saved memoized thing.
+
+Tony Kay: Um
+
+Tony Kay: so there's a type shallow and a type deep.
+
+Tony Kay: Type shallow only remembers the top level siblings. So if this is the state hierarchy, there's a wizard state, a history node, a step two, one, step two, and then within step two, there's substates 2 A and 2B that are nested as children.
+
+Tony Kay: Uh then the history, if you exit the wizard state, will only remember if you were in step one or two. It will not remember 2 A or 2B. So if you come back to the history node, it'll restore say step two, but then step two will always jump to 2A, which is its default initial. It won't go to 2B, even if that's what you were on.
+
+Tony Kay: With deep, it remembers the entire hierarchy of active states in the configuration relative to wizard, right? So So here, if you navigated away and were on 2B and then came back, you'd still be on 2B.
+
+Tony Kay: Uh there's no way to specify how deep deep goes. It's just all of it, right? I guess in their analysis and the papers and specs and stuff, they decided that they didn't need you to be able to specify the depth you wanted. Um I'm not sure why. I think possibly because you can construct any uh limited depth with a sequence of shallows. You could put a shallow here and a shallow there and a shallow and a shallow, right? That would give you arbitrary depth, but for convenience, typically you either want one level shallow or all of it.
+
+Tony Kay: Question about the concept.
+
+Host: Yes, I think I was not paying attention, but the history note has to be a sibling note for the ones.
+
+Tony Kay: Yeah, I'm going to talk about the actual coding of it here in a second. More more concept of just shallow versus just deep is all we're trying to do here.
+
+Host: Oh, no. Yes.
+
+Tony Kay: Okay. The way this actually looks and this this is important. Uh you do put the history node on the the the kind of the immediate child of the state whose history you're trying to record.
+
+Tony Kay: You specify the type deep or shallow.
+
+Tony Kay: Again, you can put history nodes on children. So if you don't say deep, you can sort of record right the partial graph if you want by just nesting more history nodes.
+
+Tony Kay: Now, here's the trick.
+
+Tony Kay: If you want history to trigger, then your transition has to transition to the history node,
+
+Tony Kay: not necessar not like some specific substate, right? The history node will only apply if it's the node that gets transitioned to.
+
+Tony Kay: That's that's the main trick, right? So, this history node says if you transition to me and I don't have history, I'll go to step one. If I do have history, I'll take you to whichever configuration I I was in last time you were here.
+
+Tony Kay: But, but be very careful that you uh when you target transitions into the state where you want to restore history, you shouldn't even target the top level thing. the top level things initial will target the history node. Um uh but that's sort of like you're relying on document order kinds of things. You're much better off targeting the history node explicitly when what you want to do is restore history.
+
+Tony Kay: So that's that's my main point here is you you should target wizard history not wizard if you're trying to invoke the history. If you're trying to skip the history, even if it's there, then target step one. Like just target the thing you want to go to. I want to start the wizard over. Target step one.
+
+Host: Right? That gives you both possibilities. You're not stuck with the history that it recorded.
+
+Tony Kay: And that's what this slide is about. Okay. invocations. Anybody have any other questions about history? I mean, it's just recording the configuration. Um, and
+
+Tony Kay: on entry, on exit behaves like you're entering or exiting the states, like all that stuff works just as you'd expect it. The only trick is the transition that you use.
+
+Tony Kay: Okay. Ah. Oh. Oh. Oh. One more note. One more note. If you if you target wizard, I forgot history isn't technically a state. And so this guy's initial will default to this state. Period.
+
+Tony Kay: Because history isn't a state. It's a marker indicating you want to record history.
+
+Tony Kay: So that that's an important Yeah, that's an important one. If you target wizard, even this history is the first thing, you won't get history. You have to target the history.
+
+Tony Kay: I wonder then why wasn't history like an option? So um
+
+Tony Kay: I don't know. I think because it wants to be modeled in the diagram as a special thing like when you're when you're drawing a state chart uh and and a node has history uh it's drawn as a circle with h that transitions to a
+
+Host: particular node by default.
+
+Tony Kay: That's how it's drawn. And so I think they wanted it to be a separate node just so that you understand it gets its own diagramming element.
+
+Host: Right.
+
+Tony Kay: Okay.
+
+Host: All right. Invocations.
+
+Tony Kay: Invocations are essentially state charts you want to run from another state chart that are controlled by the parent. Okay,
+
+Tony Kay: this is different than starting a state chart that uh you just run arbitrarily
+
+Tony Kay: like I can start a thousand subscription state charts. They aren't related in any way, shape or form. They all run in parallel, right?
+
+Tony Kay: uh technically in an expression of a state chart I could spawn in our system
+
+Tony Kay: a new session with a new state chart that's completely unrelated to the parent. Right? So this is different. Okay. So so separate the idea of there's a way to run a state chart. There is. There just is. You can start it. You give it a session ID. You give it the state chart definition. It's running. Period. No relation whatsoever. If you want to send an event, you need to know its session ID. Uh if it wants to send you events, it needs to know your session ID. There's no join point unless you invent it.
+
+Tony Kay: Invocations have a joined point.
+
+Tony Kay: Um and control.
+
+Tony Kay: So an invocation is a node that can
+
+Tony Kay: invoke actually a state chart or anything else you want to plug into the system. You can actually create invocation processors uh that we we saw there's a protocol for this. If you implement that protocol with a 100 different things, then there will be a 100 different kinds of things that your state chart can control.
+
+Tony Kay: Here's the semantics though. An invocation starts when its state is entered.
+
+Tony Kay: So the state chart here would run when this invocation is active. And if the invocation state is exited, then the child state chart is automatically killed. Now, it's it's actually sent a termination event and allowed to process that. So, it doesn't just get like, you know, kill minus 9 sort of Unix style, you're dead. You don't even get to know it um for state charts. But I've got an example in the repository that has a future invocation where you can invoke something that runs in the future and when you leave the invocation, it calls future cancel on it. It's just a way of like having the state chart be able to start a thread to do some processing and then if you exit that state it it it finishes the thread that sort of thing.
+
+Tony Kay: So, so invocation life cycle is controlled by the state chart. So that's nice, right? You can stop and start it automatically without having to have an on-end entry and on exit and all that mess. uh it also has the ability to automatically forward events from the parent chart through to the child chart as long as it's active or the child invocation. Right? So that future if it invents some sort of way of receiving events from the event queue because the protocol has a hey I send you I'm sending you an event kind of thing then then that thread could receive instructions from the parent chart that sort of thing. So it's a it's a completely abstract generic interface that we largely just use to run state charts. And this is the default type of an invocation is a state chart.
+
+Tony Kay: Um when state charts uh finish then you'll get a done.invoke with the ID of the child.
+
+Tony Kay: These IDs are autogenerated in our system and they're actually uh UU IDs I think. So this is not a fun thing to get explicitly but if you give the child an ID then you'll get that specific uh uh done event
+
+Host: um I'm trying to understand the uh forwarding so like if there is no auto forward
+
+Tony Kay: if there if there's no auto forward then nothing really happens Right. Uh the as long as you're in this state, you're in that invocation, uh that invocation is running. If you leave the parent, the invocation ends. U that's it. If the invocation terminates before you leave its state, then you'll get this event to tell you, yeah, that invocation's done.
+
+Tony Kay: Um so that you can like transition away if if you were just waiting for the invocation to to finish with autoforward true. As long as this invocation is active, any events received uh by this state chart are forwarded to
+
+Tony Kay: the invoked state chart. So both your parent state chart and the invocation invoked state chart get that event. It's just copied onto its event.
+
+Host: Yeah.
+
+Tony Kay: All right.
+
+Host: Yeah.
+
+Tony Kay: And okay. Okay. So there is no wait cuz I was thinking like okay if the child doesn't match the event doesn't find any transition then that's when the parent gets it. Okay.
+
+Tony Kay: Oh no it goes to both. Yeah it goes to both. So there's no transition since this isn't a transition. Your transition enabling rules still apply to the outer chart.
+
+Tony Kay: Um
+
+Tony Kay: okay. Uh although that's interesting uh with the auto forward to be honest I don't know what happens if you have a more deeply nested atomic state uh that has a transition that captures that event.
+
+Tony Kay: I I my understanding is auto forward just every event that happens on the thing while it's active it just passes along.
+
+Host: There's no filtering whatsoever.
+
+Tony Kay: And and I guess you can send external events to that.
+
+Tony Kay: Absolutely. If you know the state charts ID, yes, if you know the invocation's ID, uh then then yes, you can use the external event Q to send events. uh as well. Uh you can also and this should be oh that should have been the next oh there's a little bit more to invocations and that's that the child chart has the parents the invoking parent session ID and it can send an event to the parent from the child and when you do that uh uh you can actually have a node called finalize that pre-process the event before this before it's actually then processed by the state chart algorithm.
+
+Tony Kay: uh it's a way of morphing it's it's an adapter pattern. It's basically a way of adapting things that are coming from a child chart into your parent chart uh before your parent chart does something else with them.
+
+Host: Okay.
+
+Tony Kay: So there's birectional communication mechanisms basically all you need to know. You can look at the documentation and tinker with it to to actually get it to work. So life cycle event forwarding child can
+
+Tony Kay: talk to parent. So they're connected.
+
+Tony Kay: Uh so imagine like in the routing system we've got forms and reports and things like that. If you make a report an invocation then the report starts when you enter the invocation but it's a separate state chart that runs that report. And when you leave that route the invocation kills the state chart that was running that report. So it's no longer in your state. and um that kind of thing.
+
+Host: So as an example of usage,
+
+Tony Kay: but you can have it such that the routes like when you want to leave the route sends it to the child invocation, the child state chart and that determines whether or not maybe the form is dirty and
+
+Tony Kay: sure. Yeah. Yeah. Yeah. Yeah. That's designed into the routing system though. That's not just part of state charts, right? That's the routing system. It's actually kind of a complex mechanism, right? because an invocation has to go look at uh the child chart to figure out
+
+Tony Kay: if it's busy and the child component like you know how how do you figure that out? Uh so that's a little more you know something you've got to build on top.
+
+Host: Yeah.
+
+Tony Kay: Yeah. But that that is the idea.
+
+Tony Kay: Okay. Uh managing state versus state. I don't remember what I was. It's been two weeks. What was I talking about here?
+
+Tony Kay: Okay. Yeah, I remember what I was talking about. Okay. So, remember we talked about the data model there being a local data model that's just meant for the session of the state chart. I've got 10 different sessions of the same state chart. They've each got their own private data that they can work with, right? Uh something I've seen AI doing and I suspect people will also do as well is
+
+Tony Kay: is either is is misusing uh the local data model to save things that shouldn't be kind of permanently stored in that local session memory.
+
+Tony Kay: Right? So uh uh good examples of things
+
+Tony Kay: that you might want to put in local data are is things that must survive across states that live for arbitrary amounts of time. Right? So for example in that routing system remembering what route they were trying to go to. Uh the dialogue is going to pop right remembering that through a potential sequence of UI operations and such where there might be multiple steps or something. Uh same same with the um sorry let's say you've loaded a bookmark and you're not logged in yet, right? And you you want to go to this accounting report, right? Uh but it turns out your password's expired, right? I'm going to take you through a whole sequence of steps to reset your password that are a whole bunch of different routes and I need to remember once you actually get logged in where did you want to go now?
+
+Tony Kay: Right? That's a good use for this this local data store, right?
+
+Tony Kay: Um, you might you might want to be storing like I don't know accumulated wizard answers isn't a good good one necessarily because we would be using rad forms and the wizard would actually be one form with multiple steps. So folk state would be storing that which actually technically in the folk data model is part of the data model. So I guess I guess maybe that is true accumulated wizard answers right I'm actually remembering that data over time. uh retry counters. Let's say you've got some network mechanism in your state chart that's trying to make some operation but make it more robust.
+
+Tony Kay: So the operation fails and it it's going to try again but you want sort of exponential back off. You want to know how many times you tried. You need to remember where you're at. So that's great for that local data. So so sort of think about like almost like class based that class-based ID uh idea of I've got some data. I need to keep track of something. Uh, okay. Where it's not good, uh, oneshot values. So, so for example, uh, a loading flag. Uh, you're probably
+
+Tony Kay: better off modeling that as a state, right? You have this asynchronous idea of I'm I'm waiting for something to happen that happens at some arbitrary time in the future. You should actually move to a state that can handle the various problems that might happen there. Right? There could be a network error. There could be a whatever, right?
+
+Tony Kay: Uh your response could be malformed. There all sorts of things you might need to handle. Probably better off having a state. Uh something I've seen AI do is
+
+Tony Kay: is using uh local data to save a computation
+
+Tony Kay: that is only then used in a transition cond expression immediately.
+
+Tony Kay: Um, do I have a do I have that example like this? Uh, um, well, no, this isn't the bad example.
+
+Host: That's a good
+
+Tony Kay: that's a good example, right? Saving the URL, redirecting later. Uh, here we go.
+
+Tony Kay: Uh, on entry assign should retry some value. And then the con is just look at should retry. Just just move this logic into here.
+
+Tony Kay: Right? That's it's kind of a a silly thing to store in local data uh because you you can compute it very quickly in the condition itself, right? So so you're just better better off doing that. Um same with like store
+
+Tony Kay: a loading flag. Well, you're probably going to be in loading anyway, right? duplicating duplicating what should be in a state or is in a state in the data model just for I don't know convenience or something right you're going to pull it out in the UI and say is loading true pull out the configuration right so so be a little careful about what you use this local data for
+
+Tony Kay: um yeah so if it if yeah if you've got a state that can just be computed, then it's not really a state. It's a derived value for like a condition. So like in our subscription state chart, um when we're trying to figure out if if someone uh uh like what
+
+Tony Kay: you know what state we should move them to, there's a choice node that right has conditions that are actually expressions that side effect and go look at the database etc. We don't have a pre-transition that runs some stuff and sticks all that in the data model, right? that would be denormalizing what's in Daytonic.
+
+Tony Kay: So if we can go and fetch it as a condition, it doesn't make sense to have like a pre-step an on entry that says, "Okay, let's go to Daytonic and look it all up and put it in the local state chart." That local state chart data lives forever. You've now put values in there that were true for a particular point in time that aren't true forever. Right? There's a mismatch in in lifetime of the value.
+
+Tony Kay: That that's actually I hadn't thought of it that way before. That's actually the best way to to state does it go in the local data model, right? It's a good idea to put it in the local data model if it's okay for it to be there permanently and its value will sort of permanently be there uh or or permanently be correct until such time as it's either overwritten or deleted by the model. So that that whole URL kind of thing, like what URL did they load the page with? Well, that's true forever. You only ever use it once in the chart. uh but it's okay for it to be in the data model and maybe when you apply it you remove it and in fact my code does uh remove that data item from the model once it's it's done using it. So so yeah think about that life cycle of the data you're putting in local data. uh are you keeping it for just the time period that it makes sense? And if that time period is kind of instantaneous, maybe you just compute it.
+
+Tony Kay: And then they've got an example here of a shopping cart, right? Uh modeling your
+
+Tony Kay: cart is empty, the cart has items, the cart is over the limit as states is kind of silly. Just keep track of how many items are in the cart. Right. Um and and that's that that's enough, right? Having that in the data model is enough to get everything right. And in fact, that's probably uh at least in the folkloral case, this particular example is it's in the folk app state, right? You don't you don't need to keep track of it as individual states in the state chart. It's already information that exists um as just part of the the regular data model.
+
+Tony Kay: all right. We'll do a little bit of this. I'm not going to talk about the routing system specifically. The Tao app doesn't use the state charts routing system. The Brazil app is trying to, but it's not completely stabilized yet. So, I don't want
+
+Host: The best part.
+
+Tony Kay: What's that best part?
+
+Host: It's the best part.
+
+Tony Kay: Yeah, it's it's is homework. Uh, feel free to go look at the the Tao expansion project and and see how the the routing looks there.
+
+Host: I can talk about it if you guys want later on.
+
+Tony Kay: Yeah, it's just get we're getting a little long here. We've been on here for how many hours now? We have three
+
+Host: since 10 a.m. So, yeah.
+
+Tony Kay: Yeah. So, I'm I'm I'm getting really tired and I usually don't get tired when training.
+
+Tony Kay: I'm sure I'm sure some of you are just like, "Oh my god, my brain hurts.
+
+Tony Kay: There's a lot of information to absorb in one sitting." So the folk integration is really modeled after the UI state machines patterns that that I had originally designed for it. So state charts themselves, we're we're kind of done with them. That that's how state charts work. Those are the elements you have.
+
+Tony Kay: uh you can mix and match, you can compose, you can invent nodes of your own that are composits of those you know primitive elements uh to great effect uh you know when you when you see the actual here let's let's just I said I wasn't going to talk about it but let's just go look at it where's the routing at which name space go root or system
+
+Tony Kay: is it this one no you muted help me out where'd you put the routing root.
+
+Host: I don't know if it's merged in yet what I did.
+
+Tony Kay: Oh, here it is.
+
+Host: I know you're in the wrong branch, but yeah,
+
+Tony Kay: I'm on the wrong branch, but this is basically what it looks like. Um,
+
+Tony Kay: so, uh,
+
+Host: sucks. Like what you're seeing here sucks like you haven't rebased and I don't like this one. Made it much.
+
+Tony Kay: Well, all right. Give me a second. See if I've got any changes here.
+
+Tony Kay: Master is good enough in my opinion. Sorry.
+
+Tony Kay: This better or did you put it in root?
+
+Tony Kay: Looks the same to me. Oh, I haven't pulled the state changed a bit. But um
+
+Tony Kay: the state chart changed a bit. Wait, it's in the same place where you were at, but you can show like the routing UI and the state, you know, like
+
+Tony Kay: show I I was I was mainly interested in just showing what this looks like. So, so these are custom states that we've designed into the routing system. These are invocation states that will invoke the state chart that's colllocated on this target. So, this guy's going to have a state chart that it'll invoke
+
+Tony Kay: um uh when it's entered.
+
+Tony Kay: Uh and so this gives you a way to just say here here are my routes and here are the components that make up those routes and oh by the way here's a here's a you know a thing that I run on entry or on exit because these are just states. So I can put you know an on entry handler here etc. Right?
+
+Tony Kay: So uh and these custom nodes just do nothing more than emit uh a parallel or state based on whether or not the parallel option is true. Here node with props with an ID. This is an open map so you can put customized properties on these and find them later. An on entry that does things like establishes the uh route parameters from the URL. uh initializes the route, updates the parent query dynamically so that you don't have to do any complex query composition manually in your UI. Um and
+
+Tony Kay: keeps track of uh what what idents are currently on screen.
+
+Tony Kay: This this remembers I think which ident you're on and this forgets oh no this is the remember right. Um so internally it's using the data model to remember what's currently on screen. Uh because you could have parallel regions where there are multiple things on screen like uh say a master uh uh slave master
+
+Tony Kay: whatever they call it like you've got the list on the left and the forum on the right kind of thing both things are active simultaneously like a reports running with a forum. uh that would be that would be a a use case for a parallel node where you want both to be active at the same time.
+
+Tony Kay: Um and so this is a good example of, you know, a fairly complicated thing that you would just have to write and repeat and repeat and repeat and repeat throughout your entire application turned into a single, you know, line of usage at the state chart level. And since most of that's executable content, this still draws pretty nicely because it's just a single note. It's just a single statement.
+
+Tony Kay: And then I showed you the routes implementation earlier. This is actually emitting a transition that can go directly to any one of the the targets that exist down here.
+
+Tony Kay: So, you know, you can basically make it so that you could type a whole lot less, right? Because you've got closure. It's just a data structure. Make a function that returns better data structures.
+
+Host: And we're also handling the logging in and logging out, which I think works in the state chart.
+
+Tony Kay: Yeah. Exactly. Like like the whole startup, logging in, getting the configuration, figuring out who you are. Yep.
+
+Host: Yeah.
+
+Tony Kay: It's lovely. So, so this whole this whole mess of which I keep whining about into Tao, right, that that was made over the years of component did mount and side effect this and side effect that at the UI layer just evaporates like the
+
+Tony Kay: code is just pure just show me what's on the what's in the database just show it um all the logic of getting set up waiting for things to happen etc uh can all be in the state chart
+
+Tony Kay: There is one particular topic uh I don't really want to talk I mean you guys are are you all familiar with the actors aliases idea from UISM maybe not all of you are
+
+Tony Kay: um in fact I know some of you aren't so let me talk about it this was an invention that I made with UI state machines because what I wanted was state machines that could work with fulcrum and I wanted the state machines to be reusable because the primary thing that I was going to use UISM for I wrote it in order to write RAD. So that was the sequence of invention, right? So I had fulcrutations. It's like all right, when we get into this complex logic, mutations aren't enough, right? You get into the whole callback hell. Like it doesn't solve the problem as well as I hoped it would. uh it abstracts away the full stack nature which is nice but you still have this mess of I have to write a mutation that invokes a mutation and on result and on error and mess right so I wanted
+
+Tony Kay: a state machine that could control a report or a form and most things are reports and forms and they have the same logic needs right you're going to validate the form you're going to figure out if it's dirty right all that stuff's normalized in form state there's no reason to keep repeating the logic over and over and over and over, right? I was tired of it. This why RAD got invented is I don't want to keep writing this boiler plate. It's stupid.
+
+Tony Kay: But if I write a set of logic, the logic needs to know which component, which form, which form and state am I working on? What fields does it have? That kind of thing. Well, folk already had you colllocating the field declarations on the component. It already had the query. It had all the data for the form. It just didn't have any of the logic. So the idea behind actors is just to say here's the class and here's its ident so that I know which thing I'm working on dynamically at startup time. I can start a state machine or a state chart and tell it your report is this guy.
+
+Tony Kay: Your dialogue for confirming things is this guy. And then the user of the state charter state machine can plug in their UI and reuse the state machine over and over and over again. And then internally in your logic when you want to read or write data you do it with respect to the actors. And because that can be annoying all right I need to say the actor report busy flag is true.
+
+Tony Kay: Then it's nice just to be able to specify aliases. This was just a syntactic convenience. make an alias called busy that means the busy flag on the actor that's the report.
+
+Tony Kay: That's all it is. It's just a way to declare at startup time I want this abstract concept of a particular component that I can go look at its component options because I know its class. So I can look at its query. I can look at its right I can look at any of the options I want to plop on there. The form options what form fields are here etc. And I know where it lives in the state map because it's normalized with its item.
+
+Tony Kay: And then the aliases just give me a quick handle on the common things that I expect your UI to implement uh to work with the particular machine.
+
+Tony Kay: Cool, huh? I was really proud of this invention. This this like this this is what makes RAD easy and possible with just a single macro like defc form. Same logic. Uh when you do that deficum when you start uh a form you're starting it on the class which assigns it to be this actor the actor form and then the logic just works.
+
+Tony Kay: Okay. Um we already talked about the two data layers in Fulcro's data model. The local data is stored here in state chart session ID and then the session ID of the particular running state chart.
+
+Tony Kay: If you want to see the configuration
+
+Tony Kay: is that in that same place you have the session and the local ID. This is the session data. You have to have this in your focal query.
+
+Tony Kay: So let me let me expand on that. So Fulcro lets you treat your application as if you're doing key frame renders, right? You change the app database, it figures out what to redraw, as if it's doing a render from root. From an optimization perspective, that's a horrible idea, right? Actually rerendering the entire DOM on every transaction is expensive.
+
+Tony Kay: We wouldn't want to do that even with even with with uh React doing the VDOM optimizations. You still don't want to necessarily do that on a really complex UI. You only want to rerender the things that have actually changed.
+
+Tony Kay: By default, defc adds in a minimization, not with hooks, but without hooks. You don't don't set hooks to true. It adds in a a minimalization of the props at each render at the component layer. And if the props match what it saw last time, it doesn't render. It skips that one. It tells React this doesn't need refresh. So React can just skip that whole sub tree.
+
+Tony Kay: As a result, if you want to see the state charts config changing over time, you need to get it into the components props. The only way to get into the components props is to add it to the query. So if you want to see the configuration changing in the UI component, you need to add this ident to your component props, which if you don't know the session ID, you can just do it with a single quote. That's a regular single quote underscore and you'll get the whole table, which is actually cheap to query because it just pulls the immutable map and sticks it on your props. Uh, and as long as those props change, you'll refresh. Now, that might over render your component, but unless you're experiencing an actual rendering performance problem, who cares?
+
+Tony Kay: So, that's usually what I what I recommend adding to the query is just SC session ID with a with a a quoted underscore. Uh, if you need to see the the configuration of the state chart changing during render, right? So, if you're if you're basing what you're rendering on which state you're in, you need to do that. Any questions on that bit?
+
+Host: Nope. Okay. Think
+
+Tony Kay: it would be useful to have like in the dev thing for the Brazil to see the routing stuff right somewhere in the dev menu.
+
+Tony Kay: Oh, certainly. Yeah. Yeah. Yeah. Yeah. When you've got that top bar that's going to show which route they're on, that component is going to want to query for and it's going to use the session ID. We have a well-known session ID for that routing state chart. Uh so it's just going to include just that one session ID in its query so it can see the states changing so it can render which route is active in the menus right absolutely
+
+Tony Kay: I need to add that there's a helper function uh for this if you know the session ID that you can just use in the query expression I forget the exact it's like it's like uh uh state chart session ident
+
+Tony Kay: it's in the Um there's also a local data uh the local data I think is SC is it local I think it's local data session ID something like that.
+
+Host: Yeah. Uh you can find these just by looking in your focal state map and in inspect.
+
+Tony Kay: Um okay.
+
+Tony Kay: All right. The other thing that I recently solved and this was required to get routing to be good on the front end.
+
+Tony Kay: This was this was a big realization. This was huge. Oh my god, this was so huge. Um uh so I I've written this state chart routing thing like three times and the first two times it was just complete garbage. I was just so unhappy with it. And uh I sat down to have a conversation with Claude to see if I could, you know, you know, think my way through it in a conversation. And as I started to type the prompt, this solution hit me and I was just like, "Oh yeah, Claude has to implement this for me." So instead of asking it, having a conversation with it, uh, I asked it to implement this particular thing. Um, which it did. Uh, and I'm pretty sure
+
+Tony Kay: it's right. Like it seems to be working. We I had it write tons and tons of tests. uh I've not used it super heavily, but I know there are other users out there that are already using the routing system and nobody's complained about this particular feature of state charts.
+
+Tony Kay: So in recent versions of the state charts library what I did was I realized
+
+Tony Kay: that when you're in the server so so like the um uh in our in our DTO system
+
+Tony Kay: and we've got some say like onboarding or subscription that's actually this this subscription state chart is kind of the quintessential uh example because it's got just so many side effecty things that happen.
+
+Tony Kay: This choice node, uh, not that one. Where's the Oh, there it is. This choice node right here. Right. Uh, I'm I'm hitting this unpaid condition, which is going to check to see if the plan is paid for, and if so, go to state paid. Otherwise, I'm going to go to the grace period state. Um, so so this condition right here, plan paid for, has to do IO. It goes and it hits
+
+Tony Kay: it grabs a database and it hits this which runs this period 4 which runs a query, right? Uh which gets all these periods and then reverse map blah blah blah, right? It does a bunch of work.
+
+Tony Kay: The state chart sits right here waiting for it to do that work.
+
+Tony Kay: This is actually very very nice. Right? I'm sitting here waiting for the answer to plan paid for and it might take several seconds and that's okay. The thread running this event's just going to block and when I get the answer I will do the right thing in the state chart. Okay, move to JavaScript land.
+
+Tony Kay: There is no blocking IO. It's impossible to write this chart this way. Uh uh because the expressions this question mark if it needs to do IO it's async. It
+
+Tony Kay: cannot block the thread.
+
+Tony Kay: And so there's no way to write this chart this way. What you have to do instead is write a bunch of intermediate states where you schedule the getting of the IO, go into a state where you're waiting for the result of the IO and then evaluate it. Right? It doubles or triples the number of states you need to do anything reasonable. And that is is the realization I had about the routing being ugly. So, here's a use case in routing where I've got to do IO, but it's going to cause me problems.
+
+Tony Kay: Let's say I've got a route uh really simple. I've got a logged in route. The login in order to get into the logged route, I've got to call check session, which is a load at least. That's the minimum, right? I've got to go retrieve the user's current session asynchrony right there. So now I have to have another state that puts you in sort of a waiting for are they logged in kind of thing. Right?
+
+Tony Kay: Now think about the the whole I'm trying to go to some accounting report that's nested in some place in the routing.
+
+Tony Kay: Right? I've got to get into three different states and they all have potential to need loading something and
+
+Tony Kay: they all have the need to to have the stuff that's above them happen first, right? I've got to resume the session before I can start loading the uh company information and I need the company information before I can start loading the accounting, right?
+
+Tony Kay: Etc. There's like a sequence of loads.
+
+Tony Kay: So imagine this tree of routing and I need to go through this sequence of steps synchronously in a system that only allows IO via asynchrony.
+
+Tony Kay: The state chart's going to be a nightmare and I'm not going to be able to use clean on entry onexit handlers to say on entry load this thing with the implication that I don't do the next on entry until the load is done.
+
+Tony Kay: Right? I want the ability to write the state chart as if the expressions in the state chart block.
+
+Host: Yeah.
+
+Tony Kay: I want this plan paid for in the in the front end to be able to do a folk load and sit right here until the folk load's done. If it has to move to the next state, if the state chart has to keep processing because the expression didn't block, then I'm screwed. So, as I was starting to write this explanation to Claude, it hit me, oh, I just want to park. I want to park instead of block, right? Parking is where I let go of the thread, but it remembers where the thread was running so that when the result is there, I continue from there.
+
+Tony Kay: It's like a continuation. That's what I want. and asynchronous constructs
+
+Tony Kay: already exist in closure to make that relatively easy to code. So what I needed was to to write remember remember earlier when I said I was showing you all the protocols
+
+Tony Kay: um we were looking at these these protocols and I said the processor is pluggable because you know I was thinking backward compatibility forward compatibility.
+
+Tony Kay: Guess what?
+
+Tony Kay: If you implement a processor that parks instead of blocks, you can plug it in.
+
+Tony Kay: So I had Claude write a new implementation
+
+Tony Kay: of that algorithm with async support, async parking.
+
+Tony Kay: Uh, I think there was one minor but compatible change to the overall structure of the library which I was just like I was so happy.
+
+Tony Kay: Anytime you can do this kind of like serious internal restructuring kind of thing without breaking users, it's amazing. Like think about that. We just added a whole new implementation that still follows the exact semantics of state charts, but when you return a promise from an expression, you can choose the block.
+
+Tony Kay: That's pretty cool.
+
+Host: Yeah, it is.
+
+Tony Kay: So, so that was the realization. And so now there is an async execution engine that you can select. It still defaults to the non-async because that's right. Right? I don't want to break existing users. But if you install focal state charts with async true uh then you have support for uh parking in the execution engine but
+
+Tony Kay: it's selectable even then. Uh so there are asynchronous fulcr operations uh where this will block and then schedule these events but you'll sit here on this on entry until this load is done and then it'll send the event right or uh if you use the older operation which I did not delete even with async true this one doesn't return a promise and so the state chart immediately continues. So if you want to continue using the I want to model each thing as a state, you can still do that because both are actually useful.
+
+Tony Kay: Routing really wants the ability to block because you're trying to establish a nested hierarchy of states into the configuration and the sideffecting of loading needs to block that establishment as you go for the for the routing, you know, state chart to look clean and to be easy to reason about.
+
+Tony Kay: But in some cases, you actually do want to model the IO through a sequence of steps because of whatever, right?
+
+Tony Kay: Specific kinds of handling or whatever you might want to do. Uh like you just might want to spell it out. Uh so you can do both.
+
+Tony Kay: Um the the and that brings to mind the the one disadvantage with this particular thing is that an an asynchronous op since it blocks the chart right here in the UI while this load is running. You won't see the state chart moving. It'll be it'll be stuck on whatever this state is that this on entry is is currently running and the configuration will be in transition inside of the internals of the state chart.
+
+Tony Kay: Now we have load markers, right? So you can still make an observable thing happen in the UI based on, right, Fulcro's load management system where you can do load markers where that modifies something in state that you can then render on the UI. Uh but you're you're not going to model the the loading concept as a particular state that you
+
+Tony Kay: can view from the UI. So that's the trade-off, right? When you do these asynchronous side effects, you block the chart. It's not moving. It's got an intermediate in-memory state happening thing happening that until the micro steps are done, it won't write the the state chart value back to the storage. So that's the main thing to to know about that. Do I have a question? Um if the promise fails is like is it a
+
+Tony Kay: custom event or is it the default you know error mechanism that is triggered as if the expression had raised an error
+
+Tony Kay: good question I don't remember and that may be that may be underdefined it may not be well defined um the way for example load is modeled is uh it's it's going to finish some way
+
+Tony Kay: shape or form like the the promise itself is going to be satisfied with either the network request succeeded or the network request had an error. So the promise is going to be fulfilled.
+
+Tony Kay: Um in the case of of returning a
+
+Tony Kay: uh a promise all you're guaranteed is that the the um when the promise is done in some way, shape or form that you'll unblock. I I I I think I left it up to you to figure out what you actually do uh from there.
+
+Host: Okay.
+
+Tony Kay: Right. So, the whole promise catch that that kind of thing. I I I may have put something in, but to be honest, I honestly don't remember. uh because the primary use case I have are these use cases with load and and transact where we're already kind of just assuming uh the mechanism itself is going to succeed. So the promise just can't fail.
+
+Tony Kay: but we could make it if I didn't we could make it so that a promise failure uh uh could be considered an expression error and the expression error right that already has a well- definfined uh behavior in the state charts right if there's an expression error you fire uh an an error uh event automatically
+
+Tony Kay: Yeah, absolutely.
+
+Tony Kay: But yeah, I honestly don't I don't know if we're doing that uh at this point. It's such a new it's a new enough feature that if we decided that semantic is what should be implemented, we could do it.
+
+Tony Kay: Okay, I'm done. That's that's all the stuff that I wanted to talk about.
+
+Tony Kay: Uh I don't know how many hours are left in the day there. Two or three.
+
+Tony Kay: Did we finish the talk on time?
+
+Host: I think about 3 or 4 3:30.
+

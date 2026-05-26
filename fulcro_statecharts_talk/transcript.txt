@@ -1,0 +1,1000 @@
+[Preamble: tech check]
+
+Tony Kay: Think enough?
+
+Tony Kay: Yep.
+
+Host: Okay.
+
+Tony Kay: So, we were going to talk about state charts as soon as my intelliges. There we go.
+
+Tony Kay: All right. So, the first thing that I want to do is just give you a quick overview of the basic state charts
+
+Tony Kay: ideas.
+
+Tony Kay: I don't know if I want to bother with tests or anything else. Is that still the same zoom level?
+
+Tony Kay: All right. So as most of you already kind of know, I
+
+Tony Kay: tend in functional programming, I tend to build programs uh as much as possible with the philosophy that most of you are used to and know of immutable value pure functions. Um whatever you can do with that, do that. Um and so folklore for example, the state map is an immutable value and mutations take that from one state of the world to the next state of the world. State charts works the same way. The idea is you've got the state of the state chart along with the data that goes with it. Something happens that takes the state of the state chart from one step to another as the mutable value. So that's that's the general operational uh kind of
+
+Tony Kay: idea. And if we look at the if you look at the guide I even like kind of some basic examples in here of
+
+Tony Kay: machine is not going super fast or something.
+
+Tony Kay: CPUs are all tagged.
+
+Tony Kay: Looks like the colonel is doing some indexing or something. Okay. Um
+
+Tony Kay: yeah. So this this little simple traffic light example in here, right? A state charge is a declarative thing. It's just a nested map. Um the nested map actually gets turned into a uh
+
+Tony Kay: kind of a normalized representation sort of like a fulcro state database uh by the state chart function. This top level function here. Oops. To do that
+
+Tony Kay: please don't refound. This uh this top level function here actually normalizes. What the hell is it doing? Oh, this source file is actually here.
+
+Tony Kay: It's taking me to the source file that I included uh in in the ASKI doc. I didn't actually type that into the ASKI doc. It's a it's a link to this document.
+
+Tony Kay: Um so so state chart here, if you if you had a ripple running,
+
+Tony Kay: when you make a state chart, it ends up just being
+
+Tony Kay: this data structure where um it's got the top level kind of ID of the state chart itself, which nodes in the chart are the immediate children of the root and then a map of elements by ID.
+
+Tony Kay: So for every state that has an ID, here's what the state had in it. And then the children are referenced by ID.
+
+Tony Kay: So instead of it being a tree, like I said, it's normalized where that's the ID of a state. Therefore, if I want to find or a node, if I want to find a node, I can look it up in this map. Um,
+
+Tony Kay: so you can use this like you can use this data structure to do things like draw diagrams. That's how that state chart diagramming thing in folk inspect works. It actually takes this data structure, analyzes it, turns it into a dot or whatever, an elk diagram
+
+Tony Kay: just following the edges.
+
+Tony Kay: So you got the normalized table there.
+
+Tony Kay: Then uh this uh state charts care about the order things come in. And so the the state chart function automatically goes through and for every node it finds as it finds it, it gives it a number in order of reading order. So that's part of the the specification for state charts is when you're trying to distinguish between two things, you distinguish them in reading order. Like if you were reading the state chart um you know at at this level out here uh um
+
+Tony Kay: like if there were if there were for example uh two transitions in this state, it looks at this one first and then this one next. So if they both have the same event, the one with the event and condition typically, right, uh that matches first is the one that taken. So in document order is a thing.
+
+Tony Kay: So that's why there's a table of what order did this thing come in. So if I'm having to in the algorithm internally distinguish between two nodes, I can figure out which one has precedence.
+
+Tony Kay: Um and then uh this is the this is
+
+Tony Kay: basically the sorted list of states, right? Another way of looking at that same sort of document order. What order did these nodes appear in? Uh and so these are just useful for um uh
+
+Tony Kay: implementation detail. So the state chart is an immutable value. uh and then the operation of the state chart and and here simple end jump in here and show you the some some a basic a really basic core thing here. The state chart system
+
+Tony Kay: uh state charts in general uh are rather abstract. The standard that I went from uses XML to define them
+
+Tony Kay: and there are a lot of things that are left left open to the library that implements the standard. Uh so for example, when you access data in a state chart, how do you get to that data? Where does the data go when it's running? That's kind of open. It's open-ended. They don't even tell you how to structure it. They just say there's going to be some data and you can kind of use these following kind of abstractions to talk about. So I made a protocol for the data model with the idea that I don't know how you want to define your data model. I'll give you a couple of predefinations, but if you want to define your own data model, here's here's what you would need to implement in the protocol to satisfy the general constraints.
+
+Tony Kay: Uh, you can send events to state charts. Well, how do those events get there? Standard says nothing about that. It just says you can send an external event. The external event gets delivered with some delay. Well, I could use core async for that. I could use uh uh, you know, a really simple vector an atom for that. I could use an SQL database for that. It's I need to be able to send the event and then have it somehow get received. Uh and so the event Q protocol has a thing that says here's how I want to send it. Uh here's how I cancel one that I previously sent because that's something you have to be able to do uh in a state chart. You have to be able to say, oh yeah, that event I scheduled, I don't want that one anymore. And then there has to be something that the implementation itself can use to say all right I I want to I want to process events now here's the handler go find events and tell me what to do.
+
+Tony Kay: Uh the execution model has to do with when you put expressions in the state chart in the standard it's like yeah you can put an expression here but what language is that in? Is it in JavaScript closure closure script? It turns out the standard doesn't care and we don't either. uh if you can give me some sort of expression uh and I can define a protocol that can run that expression then that's all you'd have to do to make an execution model for running conditions and scripts inside of your state chart. It's completely open-ended.
+
+Tony Kay: Uh and then because the standard has changed over time uh for processing state charts. So there was a a standard in 2012 then they updated it in 2015. That's the most recent one. They might update it again.
+
+Tony Kay: I have a standard in libraries that I don't break things, right? Um if I if I upgrade the version, you have to opt into anything that I do if possible.
+
+Tony Kay: There's any way, shape, or form I can give you uh a new version of the library without changing anything that you rely on other than optimizing it or making it better in a way that won't break your code. uh they don't want to do that and so since there's a current standard and there might be a new standard I defined the idea of a state chart processor as a protocol so you can start a state chart a state chart can exit and a state chart can process an event and that's the real working code of you know take the current you know picture of a state chart and give me back a new picture of a new state chart uh and then this algorithms director here the current implementation for the version 201591 is implemented in this namespace.
+
+Tony Kay: But if there were a new standard, I could make a new name space for that new version and then you could opt into it by choosing a different processor for your state charts.
+
+Tony Kay: But you could opt into it per state chart even if you wanted to.
+
+Tony Kay: And then there's a protocol for invocations. So the idea with invocations is uh a state chart can start another state chart. And so this is the the system that would let you start things of other kinds. They don't even have to be state charts. It could start a future. It could start a thread. It could start some remote process. Um invocations in state chart are very abstract. So you can actually make more than one invocation processor and install it. Uh and then the state chart system can scan for those when you say I want to start this kind of thing. It can go looking for the processor that can start that kind of thing. Uh state chart registry. All right. Well, if you make a state chart, how does the state chart system learn about it? You register it.
+
+Tony Kay: And so, uh, the registry might be something that's locally stored in RAM, might be in a database, wherever you want to store these, they're just data.
+
+Tony Kay: Um, or they can be just data. The way we use them, we embed lambdas, which are code, which might have closures. Uh, so you can't actually store them just anywhere. They actually do end up needing to be in a in a RAM registry on the local server. Uh but let's say you made uh an execution model that used JavaScript strings uh for the the expressions. Uh well that would make a state chart completely serializable as data because your expressions would be strings. Uh and at that point your state chart registry could be some global database somewhere. And in the working memory store, the idea here is as you run a state chart.
+
+Tony Kay: Uh you've got an immutable value, you run an event, you get a new immutable value. Who tracks that? You could just track it in an atom like we do with the fog state. Um, but I decided to make a protocol so you could put something more complex in front of it and other pieces of the state chart system could then leverage that to, you know, pull the state charts current value, run against it and then put the new version back.
+
+Tony Kay: Uh, so it's a really simple protocol, right? Get the current version, the current picture of the running state chart, uh, save it or if you're done with it, delete.
+
+Tony Kay: Any questions on the idea of the protocols here? I'm just kind of that's the sort of theory of operation of the generics.
+
+Host: So the simplest thing you can do
+
+Tony Kay: go ahead if you have a question.
+
+Host: No, I was going to say I think it's okay.
+
+Tony Kay: So a simple end uh uses a regular you know 2015 091 processor.
+
+Tony Kay: Uh it uses a standard uh invocation processor that can only invoke state charts. Uh oh and it also in in includes a future processor. So you can invoke futures. You can start a thread as a process as an invocation.
+
+Tony Kay: Um in CLJ in CLJS there's just the state chart processor. The execution model is a lambda based one, right? So you can use closure expressions. The event Q is a manually processed Q, a manually pulled Q. And a manually pulled Q requires that you manually run it, right? it doesn't have any automation in it.
+
+Tony Kay: Uh and then the data model I I I set up by default is is a flat data model where you just it's as if you just have a map that you can carry around and you can see everywhere everywhere in the state chart. So you can put things in it and take things out.
+
+Tony Kay: So in the traffic lights example, we make a simple end and so you can just like make that end. You can register that. Uh so register is that protocol, right? Register to state chart and uh the end as you saw here has keys for all of these different things, right? The event Q, uh the working memory, right?
+
+Tony Kay: The data model, right? There's a processor, right? So the im just has keys for all these implementations of the protocols needed so that you can abstractly just say oh well register the state chart. Okay I want a I want to pull the processor out of the end and I could say start the state chart that I want to call session ID one using the
+
+Tony Kay: lights definition right the registered state chart definition lights. So I start that and then I get back the working memory of that state chart. So these are the active states, right? It's running.
+
+Tony Kay: It's got this session ID. And if I show the states there, it's going to just show me the active states there. Actually, it's it's changing over time because this or is it? It shouldn't be. No, this is just like solid, right? Uh I'm the show states uh uh eliminates some of these like parent ones just so you can see uh yeah this is a local function this filters so that I can I only see these states even though the full set of active states is this how many people here yeah yeah yeah speak up if you do not know what a state chart is because I'm assuming that
+
+Tony Kay: Not no. Uh I've used uh state machines, but I don't I don't think I know what a state chart is.
+
+Tony Kay: Okay. Well, let's let's go over this traffic light. It's it's basically if you know what a state machine is, you're pretty close. So, a state chart is a hierarchical state machine.
+
+Tony Kay: And in that hierarchy, multiple states can be active at any given time. So if this red state is active then that automatically means its parent state is active which automatically means that its parent is active
+
+Tony Kay: right so that's why we're seeing all of these different active states at a given time. Ah,
+
+Tony Kay: now because this is a data structure, you can very easily write functions to do parts of your state chart and just embed them as calls and it's legal for these functions to return a vector of states that it'll just splice into place. So it makes it really easy to to make things that are a lot more readable.
+
+Tony Kay: So a parallel node allows all of the immediate children to simultaneously be active.
+
+Tony Kay: So that means this east, west, north, south, cross, east, west, cross, north, south are all active at the same time. And you can see that in the configuration here of the state chart.
+
+Tony Kay: So all four of those are going to be active and then they're going to be in some particular state. So what we're pretending like is we're at right we're at a normal intersection. There are two traffic lights for the two different directions and there are two kinds of pedestrian signals for the two different directions and they shouldn't show you know greens in such a way that pedestrians get hit by cars.
+
+Tony Kay: Right? So we all know how these work. Um so a pedestrian signal uh starts in an initial state and that initial state uh um ID initial initial is so this is this is a little function for making a keyword.
+
+Tony Kay: So if you give it you know a keyword and a string it it does this. If you give it a existing namespace keyword it extends the keyword. So that's what that's doing.
+
+Tony Kay: And because I have two different pedestrian signals, I want crosswalk, east, west, uh, and then the name of the initial state. So this one starts out in red. This one starts out in white.
+
+Tony Kay: So we're going to start one of them in red, and we're going to start the other one in white. That's what this initial parameter is.
+
+Tony Kay: Um, and for the traffic signals, we've got an initial state, which again varies based on how you write this. East West starts out green and the crossing east west starts out red and the traffic for north south starts out red and the pen signal for crossing north south starts out white
+
+Tony Kay: and then a transition is basically when this event happens go to this state when this event happens go to that state if I'm in this state
+
+Tony Kay: Yes.
+
+Tony Kay: So states are atomic, right? They they you can only have in terms of siblings, you can only have one uh atomic state active at a time unless they're embedded in a parallel parent, which makes all of its immediate atomic children active simultaneously.
+
+Tony Kay: Okay. Now the operation is that I just got an immutable map that tells me I'm in that configuration. If I say process a warn pedestrians event on starting state zero, right, this immutable value here, I'll get the next state of the state chart. S0 is still the old value. S1's now the new value.
+
+Tony Kay: Right? If I filter out the sort of the noise, I know I went from
+
+Tony Kay: right uh I went from red, white, green,
+
+Tony Kay: red to red, flashing white, right? I'm
+
+Tony Kay: telling the pedestrians that east north south is about to have traffic, so you should think about getting the hell across the street. Um, if I go to my next state, S2, now I've got uh flashing
+
+Tony Kay: white and the east west traffic light has turned yellow.
+
+Tony Kay: And then if I continue down this like sequence, you'll see that the state chart states one at a time like the working memory goes from, you know, through the sequence of of things you would expect
+
+Tony Kay: for traffic light operation.
+
+Tony Kay: Now the point here is if I'm not storing uh if I don't have any sort of built-in loop to do this really I just have to manually do this right I I have some particular state chart state uh I run some event that gives me a new state start chart state if I don't save that I've lost it right so you know this mode
+
+Tony Kay: of operation is the pure functional mode of operation right um I'm trying as much as possible to do pure things. Process event is actually uh can actually side
+
+Tony Kay: effect because your expressions could side effect. So that's why it's got an exclamation point on it. But in terms of the state chart value itself, it is pure, right? It's going to you're going to give it a value. It's going to give you back a new value. Um well, it's as pure as it can be because technically your expressions can change what the state chart does.
+
+Tony Kay: Right. So, it it really isn't completely pure. Thus, the exclamation point. Um, but it's as close as possible as I can get. Everybody following this?
+
+Tony Kay: So, in order to make this system more usable, let's say you want to use it in folk. Well, that's going to run in a browser. So, everything here is CLJC, right? But obviously the implementation of the data model, the event cue, you know, those kinds of things needs to be something that works well in the browser and probably isn't persistent unless I don't know maybe you want to use browser local storage and store these things and have your state chart like start back up as soon as they come back to the page where it left off, right? That's actually a possibility.
+
+Tony Kay: So that that's why these protocols are there is you can actually make it work pretty much any way you want. If you wanted your state chart storage to be on the server so that you could restart the state chart for the user, but it's going to run in the browser, but it's going to load its state and save it via, you know, XHR, you know, JavaScript network requests. You could do that, right? It's a really flexible system.
+
+Tony Kay: We use it two ways or we set it up two different ways. On the front end, we currently only do front-end state charts that run while the browser session like that tab is actively running it. If you reload the tab, you lose the state chart, right? So the the Q is a core async object. The working memory data
+
+Tony Kay: store is just RAM. Uh the processor is the normal processor. Uh and then there's a um this core async event loop.
+
+Tony Kay: Uh right. This is basically if you start this this will this will automatically deliver events when they're supposed to be delivered. Uh so we run an a a core
+
+Tony Kay: async based event cue on the front end so that if you send an event and say yeah wait three minutes before delivering that event it's actually handled behind the scenes by core async behind the protocol.
+
+Tony Kay: Uh in fact we use fulcro integration. So the state charts library has a bunch of integration name spaces for doing fun things with state charts in folk um and and we actually use that. Uh so when you do the integration here
+
+Tony Kay: basically you install it uh where's my install function that starts a state chart. Here we go.
+
+Tony Kay: So you can install the fake fulcro state chart stuff on a fulcro app and that basically installs instances of all the necessary protocols in the right places.
+
+Tony Kay: So that then you can use this function to start a state chart in your fulcro app etc. So you don't have to think about like what's in the M and how is it implemented and what have you. You just you just pass the app to all these things. Start on my app this state machine with this session and the starting data and you're done.
+
+Tony Kay: There's also an invocation processor.
+
+Tony Kay: The standard invocation processor is installed, but there's some integration where you can colllocate a state chart with a component and have it auto start uh on routing. That's what this kind of UI UI route stuff is meant to be. This is sort of threequarters baked. It's we're not using it at Dao yet, but uh uh my intention is to allow you to eventually be able to build a full-blown fulkar application by composing state charts. The top level routes is a state chart and when you go to some component in that state chart uh uh the component itself maybe has a nested state chart that gets invoked for doing the all the logic around that module of that of that route that kind of thing. So that's sort of where this is headed.
+
+Tony Kay: Any questions on the front end thing.
+
+Tony Kay: We have numerous examples in the codebase, but once you understand kind of the protocol setup, it's not not too difficult to get the basic idea there.
+
+Tony Kay: All good?
+
+Host: No questions. Yeah.
+
+Tony Kay: Okay. So um how we use this in production backend is way more interesting and way more kind of deep.
+
+Tony Kay: Um so you know I've already shown you the protocol. So essentially what we need to do if we're going to have closure state charts um the idea there is well in our
+
+Tony Kay: infrastructure we have all sorts of nodes running. Uh we have compute nodes, we have UI nodes, we have API nodes. All those nodes uh are are for things like high availability, scalability, etc.
+
+Tony Kay: A state chart session is a thing, right?
+
+Tony Kay: It's a singleton. It's a thing that's running abstractly in your infrastructure. So then the question is who's running it? Is it one of the UI nodes? Is it a compute node? Is it an API node? Where like where does it live?
+
+Tony Kay: Where's the actual CPU resource that's running that state chart? Where's its current state stored like it's config its current working memory? Like what if that node crashes that's running it?
+
+Tony Kay: Doesn't it memory gets lost? Like how do we ensure that when we send an event to a state chart, it actually gets it gets processed and we keep track of that as our infrastructure. We do releases right releases shut down nodes and start new nodes uh install new versions of the software uh right it's it's an interesting distributed system problem how do I make a state chart system where my backend which is implemented across tens sometimes even you know a lot more than tens but usually tens of nodes tens 20s 30s uh of simultaneous running nodes how do I make the concept of a running state chart make sense Right? If that state chart's providing something to the user and they're interacting with the servers, each request they send is roundroin to a different server. So this idea that a state chart is running on a machine that doesn't work very well. That gets really really kind of complicated to deal with.
+
+Tony Kay: So how do we make that work? Anybody want to give the guess? Uh no no cheating. If you already know, don't don't answer. So does anybody who who doesn't have an idea want to give a guess as to how you would do it or how you would do these different protocols like here let's just walk through them right so uh the data model this more has
+
+Tony Kay: to do with u how the data model is is interacted with for a given state chart so let's let's skip that one because that that's a little complicated but an event Q would deal with an event Q And what I just described, I've got 10 closure servers.
+
+Tony Kay: A user request could be coming from a browser to any one of the servers. They might have an existing state chart that they want to send an event to.
+
+Tony Kay: How do I cue that event? And how do I deliver that event?
+
+Tony Kay: Give me some options, Evan. Give me some options.
+
+Tony Kay: Pick on the new guy.
+
+Host: Oh, no. Uh,
+
+Tony Kay: that is such a good question that I have no clue.
+
+Tony Kay: No clue. You don't even have a suggestion. Like if we were implementing this, I was like, Evan, we got this. I need to run a state chart. I need some sort of event Q that can multiple nodes can access and uh I can send events and receive them on any node. like
+
+Tony Kay: oh SQS, SNS, uh Kafka, talking about like a durable Q.
+
+Host: All right. So yeah, we need some sort of durable queue. Um
+
+Tony Kay: okay, now I'm going to add an additional constraint. When I deliver an event, I have to make sure that the the event is delivered exactly once
+
+Tony Kay: in the face of the algorithm crashing right in the middle because of a node shutdown.
+
+Tony Kay: Um I mean item potency
+
+Host: I guess does it it needs to be delivered exactly once or it needs to action needs to be taken on it exactly once.
+
+Tony Kay: Well we we can't have there's no way for us to make sure that uh any side effects that expressions in the state chart there's no way for us to ensure that those might not happen more than once.
+
+Tony Kay: We actually can't make that guarantee because we might have to we might
+
+Host: get halfway through running the event and the node crashes
+
+Tony Kay: which means we could have done some side effects. So let's assume that the state chart expressions we know as programmers that if you write a state chart expression it must if it's side effects it must be an item potent side effect.
+
+Host: Yep.
+
+Tony Kay: Okay. So so we're okay there. We don't have to worry about that. We do have to worry about it. We have to document and let every developer know you better be doing item potent expressions.
+
+Host: Okay, but think about the thing that's actually happening. I've got an event.
+
+Tony Kay: I'm going to uh I'm going to pull that off the queue. I want to make sure that if I pull it off the queue, nobody else can pull off the queue. SQS would be good for that.
+
+Host: Yeah.
+
+Tony Kay: But that if I go to run it, um uh I've
+
+Tony Kay: got to load the current view of what's in the state chart. I've got to run the state chart against that to get the new value. Now I have to write that back to the storage.
+
+Host: And now I have to say the event is been delivered and remove the event from the queue.
+
+Tony Kay: Yep.
+
+Host: Okay. Now what do you feel like we need as a requirement?
+
+Tony Kay: Any any does that help any?
+
+Tony Kay: Um, I guess my first thought is that and I I'd have to look up the specifics, but I'm pretty sure that SQS has a like you pull for um
+
+Host: a message
+
+Tony Kay: and it will hide it from every other consumer for a certain period of time.
+
+Tony Kay: And you have to send um a response that says all right this message has been handled.
+
+Host: Yeah.
+
+Tony Kay: And then it will that gives you the
+
+Host: for extended time. Yes.
+
+Tony Kay: Yeah. That gives you the event the event manipulation but you're missing the big problem. The big pro here. Let me give you some scenarios. I pull I pull a message from SQS. I've got a visibility timeout. I've got some time to process it.
+
+Tony Kay: I pull the current state of the state chart. It says my traffic lights are in such and such a state. Right? I run the state chart. It gives
+
+Tony Kay: me the new version of the traffic lights. Now the node crashes.
+
+Tony Kay: Okay. The event gets redelivered to me.
+
+Host: Okay, that's all good. I think I think that that case works. Okay. Right.
+
+Tony Kay: Um uh now let's say I do that same scenario. I pull it. I run it. I save it.
+
+Tony Kay: and the node crashes.
+
+Tony Kay: Now the that event's going to get redelivered, but I have already saved the effect of that event to my working storage for the state chart.
+
+Tony Kay: So in other words, there was a way for me to undo the fact that I actually did the event.
+
+Host: Yeah. and the state in a new state as far as the system is concerned.
+
+Tony Kay: Um
+
+Tony Kay: first thought is in the saved state either in the event itself or in the saved state. So when um the node is going to pull the current state chart inside of there, there's some way to say, "Oh, this event has already been handled. The state chart you've pulled covers this event."
+
+Host: Um and could be
+
+Tony Kay: Yeah. What if it's a high frequency state chart that gets 100 events per second?
+
+Tony Kay: That doesn't work very well. So you make you make whatever is like whatever the event like the handle of the event item potent right and that way you
+
+Tony Kay: well but how do you make it item that's the problem that's the problem that we're trying to solve here right I just gave you a case where right because you're doing each individual right you're on a computer you're doing each individual instruction one at a time
+
+Tony Kay: right yes
+
+Host: you pull the state you run the state chart you save the state you delete the event from the queue Right?
+
+Tony Kay: If you fail to delete the event from the queue, then the event will get redelivered. In fact, it could get redelivered anyway uh uh in this particular scenario and that would actually be bad, right? We want we want exactly want semantics which means uh right so so the Q as implemented
+
+Tony Kay: you would have to make what what Evan's talking about right you'd have to make the only way to make that truly item potent is to track is to give a UYU ID to each event
+
+Tony Kay: and track every event you've delivered by its ID
+
+Host: right
+
+Tony Kay: but how do you save the fact that you that you did it what if the node crashes as you're trying to save the fact that you did it, but you've already done it.
+
+Tony Kay: If you try to save it before you do it to make sure you saved it, then what happens if it crashes and you don't do it?
+
+Tony Kay: Can you have an identification of the every state that you have? So as you do a mutation you get a new like you had like in your example you had s0 s1 s2
+
+Host: and for each of those you have a identification for it
+
+Tony Kay: and so it's what I'm trying to say is kind of like a cast situation.
+
+Host: Yeah.
+
+Tony Kay: So I'm doing um this UID event on this
+
+Tony Kay: UID state
+
+Host: and therefore if I kind of lose track of one or the other I don't perform the operation. I don't know.
+
+Tony Kay: That's an interesting idea, right? So then so yeah, so his basic idea is I'll I'll I'll do some sort of Cass operation where I say
+
+Host: uh I expect the state chart to to be in in at this point in time basically.
+
+Tony Kay: Um and you could just do a time stamps. You could do a CAS with time stamps. I assume that the state chart hasn't had a an event delivered since this time.
+
+Host: I'll do all the steps. I'll try the CAS.
+
+Tony Kay: If the CAS fails, then I'll undo things.
+
+Tony Kay: you still have the problem of who undoes things if the node is crashed you can't undo anything
+
+Host: my thought on so
+
+Tony Kay: part of this I think would be splitting up so one part is okay if we store it in the state but there's a lot of rights a thought is okay incorporate something like dynamob or some other like high throughput thing where you're going to record um the event ID if there's a meaningful
+
+Tony Kay: identifier for the state chart like maybe the event it doesn't matter what like the event doesn't care what the state chart is we care not to re run the
+
+Tony Kay: event but the event itself the actual functioning it's going to do doesn't care and then you have timestamps for
+
+Tony Kay: like began processing at be and you know finished processing at began
+
+Host: and however and the number of time stamps you would have would be whatever
+
+Tony Kay: granularity would make would like fit with the architecture for we can get through like the like whatever would make sense for checkpointing like essentially be a checkpointing like okay I've begun processing and then the First step that this event needs me to do is go fetch some data. So I'm recorded that the state chart has begun processing and then I recorded that it went to fetch some data and then I record when that data came back and then I like doing that kind of granularity and you can't have infinite granularity um per se just because of physics but uh
+
+Host: well this just it so so I I wrote these comments down to help define the problem for you
+
+Tony Kay: right
+
+Host: so the semantics of This must be that events are delivered exactly once, right? That's the guarantee that that external users want, right?
+
+Tony Kay: And we're must be
+
+Host: we're going to put a quick
+
+Tony Kay: we're going to put a constraint on this sort of like swap note to devs uh expressions must be item potent,
+
+Tony Kay: right? As long as your expressions are item potent, we will give you a guarantee that it looks like your events are delivered exactly once. That's the guarantee we're trying to provide. But it needs to be a 100% never fails absolutely totally guaranteed true,
+
+Tony Kay: right? And the sequence of event processing
+
+Tony Kay: is what you just saw in this traffic lights thing, right? We we basically read the old version, run the event, get the new version and then we have to save that somewhere,
+
+Tony Kay: right? So this is like load s0 run save s1 mark event delete, you know, mark event, you know,
+
+Host: so that's that's that's essentially what I'm I'm trying to get to here.
+
+Tony Kay: And so right now if there's a failure here
+
+Tony Kay: I have actually this side affected and saved I have actually delivered the event but I've lost the fact that I've delivered the event and now I get at least once semantics. That's not acceptable.
+
+Tony Kay: If I try to flip these then I get at most once semantics. I might actually miss an event because I've I've failed to save the fact that the event that the events effect on the state chart.
+
+Tony Kay: What is this smack up? I'm surprised.
+
+Host: Positive.
+
+Tony Kay: What's that?
+
+Tony Kay: It's a false positive. But no, I I like whatever operation you do, there will always be a chance that something fails. So I I don't really know. Yeah, but there's a computer there's a whole field of computer science that has to do with this exact problem.
+
+Tony Kay: You talking about um two generals.
+
+Tony Kay: No, that's distributed systems uh trying to decide. Yeah, you you can if you do this wrong, you end up with two generals and you can never solve it,
+
+Tony Kay: right?
+
+Host: Yeah,
+
+Tony Kay: that's that's if you do this wrong. But there's a whole area of computer science that that deals with uh operations that need to happen together.
+
+Tony Kay: Ah, so like Miguel raised his hand like a like a transa like some sort of like indexing or transaction.
+
+Host: I was going to say but I I don't know if you wanted to keep them guessing.
+
+Tony Kay: No, I don't want to keep guessing. I want I want people to realize that this is the right this is this is the thing.
+
+Tony Kay: And in fact uh
+
+Host: so how do you make stuff in transaction when when it's different systems?
+
+Tony Kay: Good question. How do you
+
+Host: I I don't know.
+
+Tony Kay: You use SQL.
+
+Host: You use an SQL database.
+
+Tony Kay: Ah so I'm going to use SQL. Okay. I'm going to use the transactionability of SQL for everything.
+
+Host: Exactly. Use database like datomic or SQL. use something that has acid compliant transactions.
+
+Tony Kay: Uh, which is why this this item potency thing like like the transaction may cause you to do it more than once, but it guarantees that it either all succeeds or all fails.
+
+Tony Kay: So, as long as your side effects are item potent, it fixes this problem.
+
+Tony Kay: So, So then are you grabbing events from SQL?
+
+Host: Yep.
+
+Tony Kay: There's our protocol. Here's our implementation in SQL.
+
+Host: So there's a listener that's always waiting for event to happen.
+
+Tony Kay: Receive event.
+
+Tony Kay: uh there's a loop that runs we start a thread actually we start threads on multiple nodes so that's another aspect of this if there are lots of state charts running you want lots of threads processing events
+
+Host: true yeah
+
+Tony Kay: right so you actually start a bunch of threads and all those threads in a loop call receive events and each of those runs a transaction
+
+Host: I thought we use cq for this. Yeah, that's cool.
+
+Tony Kay: No, this is SQL.
+
+Host: Yeah, cool. I didn't know that
+
+Tony Kay: because of this issue,
+
+Host: right? And this selecting uh whether or not an event is delivered, right? So, give me uh uh for a given event. So,
+
+Tony Kay: this question mark is uh on an ID. So, I I I I find some event.
+
+Host: Sure.
+
+Tony Kay: Right. Which is this find next best event. This is a little this is an extra little algorithm for the SQL database which looks in the event queue for anything that's supposed to have been triggered already and hasn't been delivered.
+
+Tony Kay: Now, because I'm running 40 different threads that are processing events, I may get the same events as some other node. Now, we're in a race. Who's going to deliver that event?
+
+Tony Kay: Right? And so, there's some there's some kind of logic in here and then some shuffle, right? Right. There's some randomization to try to make sure nodes don't always pick the same events and fight over them.
+
+Host: Um,
+
+Tony Kay: trigger implies that the event was sent or that someone grabbed it.
+
+Tony Kay: Trigger time is when you're supposed to deliver because you can delay an event. You can say, I want this subscription event delivered a month from now.
+
+Tony Kay: Ah,
+
+Host: right. So trigger time is is the time stamp at which you want the event delivered. If you don't delay it, that's now.
+
+Tony Kay: So ID is a name and data source end ID.
+
+Tony Kay: This is so fancy. I had never seen this code. So we're looking for things where the trigger time is before now. Right.
+
+Tony Kay: It's supposed to have been triggered already.
+
+Host: Yes.
+
+Tony Kay: It's not been delivered.
+
+Host: Okay.
+
+Tony Kay: Right. And then we'll create an event data structure out of that.
+
+Tony Kay: Um
+
+Host: and then we're fighting each other to to to finish the transaction first.
+
+Tony Kay: Exactly. But we shuffle them if there's more than one. Sorry. If there's a desired target. I don't know what that I don't remember what this logic's about, but this shuffle logic is just trying to keep two nodes from picking the same event so that they conflict,
+
+Tony Kay: right? Um, and so we find the next best event and then we select the delivered field from that true or false for that particular event ID and we lock it. So in SQL this says lock that row so nobody else can can proceed from here.
+
+Tony Kay: Right? Right.
+
+Host: Will the last guy not grab lock things?
+
+Tony Kay: No. Everybody tries to grab the lock for this row and only one will get it.
+
+Host: Ah, okay. Okay. Okay. Okay. Okay. Okay.
+
+Tony Kay: It turns out in multiszone AWS, this doesn't always work.
+
+Tony Kay: So, so we also have this little reddus double check to make sure that two nodes don't run the same event at the same time.
+
+Host: Okay. So we're looking in radius and SQL.
+
+Tony Kay: Yeah. So we do a double lock on it actually.
+
+Host: It's not really a transaction is it? If we're doing ready is there.
+
+Tony Kay: It's kind of transaction.
+
+Host: I don't want to talk about this particular element of it. I still just pretend this works. Right.
+
+Tony Kay: Okay.
+
+Tony Kay: Right. I've locked the event. So I know now I'm the only transaction that can touch that event. And then I set it to delivered but I'm in a transaction. And I run the handler which you've handed me which does the state chart operations right it does the read the update the save right but all those are SQL operations right because the working storage protocol is also implemented in the same SQL database
+
+Tony Kay: right so the um there's the event Q event handling component chart where's my other Um,
+
+Host: so then the handler won't happen in the transaction.
+
+Tony Kay: No, the handler happens in the transaction. We're in the transaction.
+
+Host: Yes.
+
+Tony Kay: Handler gets the database transaction connection.
+
+Host: Sure.
+
+Tony Kay: Right. Um, and then this handler for
+
+Tony Kay: state charts here. Let's go back to where this this is.
+
+Host: So we cannot side effects, right? that
+
+Tony Kay: as long as they're item potent side effects, you can,
+
+Host: right? That's the thing we we talked about just a minute ago.
+
+Tony Kay: SQL. Where's my handler?
+
+Tony Kay: Receive one event handler. That's that handler. Oh, right. When you call receive events, you hand it the handler.
+
+Tony Kay: Um, so I I don't remember where it's at right now. Uh but the there is a
+
+Tony Kay: um
+
+Tony Kay: if we look for where this is used we'll find where the whole thing is set.
+
+Tony Kay: Right. So here's the here's the event durable event threads um and the event loop step. So we we start a task processor with some number of threads that can be configured in the config file and this event loop step uh calls receive events. Uh handle event type is a multimethod. Um yeah so there's actually more pieces to this than I remembered. Uh so handle event types of multimethod and then the multimethod for handling state charts right landmark on it uh right takes the database connection which is the SQL connection that's in a transaction
+
+Host: right
+
+Tony Kay: right um and pulls the working session memory right so this is this is that uh
+
+Tony Kay: calls that protocol method get working memory and in the working memory uh uh for this guy in
+
+Tony Kay: the working memory store. Sorry, this is a lot of stuff is an SQL working memory store.
+
+Tony Kay: So you save working memory, you give it a connection which going to be in the transaction. Uh right. So to get it, it pulls it and deserializes it. And to save it, it serializes it and then puts it in the SQL database.
+
+Tony Kay: So this can all be in the same transaction,
+
+Host: right? So if the transaction fails, it undoes any update to the state chart.
+
+Tony Kay: So that's that's kind of the glue that makes this all work is the SQL database is an acid compliant way of ensuring that we can pull the event update the event to mark it delivered pull the state machine state update it and resave it all as a unit.
+
+Tony Kay: I have I have a question multiple threads.
+
+Host: If for some reason we have I don't know let's say the working memory store in a different database that wouldn't work.
+
+Host: Right.
+
+Tony Kay: Would not work. Correct.
+
+Host: Okay.
+
+Tony Kay: Correct. You would lose the transactional consistency.
+
+Tony Kay: Part of the reason why I'm going over this in such like you know
+
+Host: painful uh uh detail is exactly that this this is actually a hard problem. Um
+
+Host: like
+
+Tony Kay: so how do we handle subscriptions then?
+
+Host: Subscriptions are a state chart.
+
+Tony Kay: Yes.
+
+Tony Kay: And right they you deliver events to them. The events are delayed like the the expiration of a of a subscription is the delayed delivery of a of an expiration event.
+
+Tony Kay: Right. Right. Right.
+
+Host: They've got a month. We we immediately send a month-long delayed event that says expired.
+
+Tony Kay: Sure. But then when will like when will like so since subscriptions or like we're getting that information from datomic like how are we handling the two databases? ah datomic is tracked it is datomic uh we we do item potent operations against datomic in our expressions
+
+Tony Kay: right so for example if if we notice in the state chart that we've expired uh we go to a state if you go and look at this the subscription state chart is our most complicated state chart
+
+Tony Kay: yes
+
+Tony Kay: you go.
+
+Host: This this state chart is uh
+
+Tony Kay: yeah it's fun
+
+Tony Kay: is 248 lines where all of the expressions have been put in a different name space. So this is just the structure of the chart.
+
+Tony Kay: Yes.
+
+Host: Right. So it's a it's a rather large chart. Uh so for example let's say that you're in the the paid state.
+
+Tony Kay: Sure. Wherever the paid state is these unpaid
+
+Tony Kay: I thought we had a separate oh here we go state paid right so in this state you can receive a an expiration event
+
+Host: and the target
+
+Tony Kay: is expired with renew
+
+Tony Kay: if their auto renew is turned So if auto renew is turned on, basically we're just going to send them a new invoice immediately, right? Uh and try to update their plan. If they don't have auto renew, then we send them to inactive.
+
+Tony Kay: Um
+
+Tony Kay: I guess where I was getting to is is this the state chart is sort of written in some cases to kind of self-heal.
+
+Tony Kay: Uh so for example, if they say, "Oh, I want to renew my uh subscription. Um, and it turns out that we had screwed up and hadn't like kept track of it right. Maybe they've already paid us. Uh, when they go into the uh unpaid state as you enter the unpaid state, uh, I thought,
+
+Tony Kay: oh, we've added HubSpot into this. Yeah. So, there's like other tracking in here.
+
+Tony Kay: Uh, basically there's some elements in here like I'm pretty sure there's a choice element in here. Yeah. Um so this node
+
+Tony Kay: basically is just a a group of transitions that is always checked in
+
+Tony Kay: this state and if this expression is true it moves you here otherwise it moves you to there. Um I'm sorry if you get if you get sent to the unpaid condition right so if we get a payment made event it sends you here and see it says all right well we got a payment uh do we are we fully paid for? If so, we go to paid otherwise uh we we'll go to the grace period state.
+
+Host: So I guess I I guess the thing that I'm trying to to say in answer to your question is
+
+Tony Kay: um the the expressions in these state charts have to be item potent and then sometimes you need to write in logic that that checks the real underlying say
+
+Tony Kay: datomic database and makes makes decisions on where to go in the state chart on that. That's not because of lost events. It's it's because of the exact problem you're talking about. The datomic database may actually not be in sync with where the state lives,
+
+Host: right?
+
+Tony Kay: Yeah.
+
+Tony Kay: And so support has things like like if you reset this state chart and start it over the expressions and the conditions that are startup conditions of the state chart will naturally move you to the right state. So, so if we look at the startup here of this, like if we go to the the very
+
+Tony Kay: Yeah, there's like initial a big initial condition. There you go. Line 205.
+
+Tony Kay: Yeah, it goes to the start condition and says, "Oh, well, if you've got a paid plan, go to paid. If you're in a grace period, go to grace. If you're in a note, right?" So, this kind of checks the datic database so that if you're just starting this a new, you could just delete the state chart altogether. You could lose it. You could crash whatever. Day datomic is the database of record of what you
+
+Tony Kay: the source of truth
+
+Host: with invoices, right?
+
+Tony Kay: Yeah.
+
+Host: So
+
+Tony Kay: yeah, that that answers my question.
+
+Host: So that's
+
+Tony Kay: but then we we don't fully have the like the fully item code and transaction cool thing where we can like just trust on our state charts forever. Like we do have this and like this will just save us in case. Well, what we've got is if you have a state chart that does not side effect, uh, we have exactly one semantics and it'll just work, right? We do have that because all that'll be in the SQL database. But yeah, as soon as you want it coordinating external processes, well, yeah, now you've got this concern of
+
+Host: is my external process actually synchronized with my state chart?
+
+Tony Kay: Did the external thing happen? Basically,
+
+Host: question mark. Yeah. Because somebody could have paid you and you know for whatever reason
+
+Tony Kay: Yeah. payment state time or whatever.
+
+Tony Kay: Yeah. Yeah. Like weird things can happen and you just want to be able to to heal it and um and so having the state chart written because the state chart is really a way to organize your logic so that you can think about the problem clearly because this is a very complex process. Before we were using state charts,
+
+Tony Kay: our subscription system was a nightmare uh to handle and it was very simple. it had like one tenth of the features that this has or less actually less had maybe five% of the features and you still couldn't understand. Um and so the state chart's a great way to organize the logic of exactly what should happen and why and where and what have you. So you can reason over it, you can draw a diagram of it. Um, but it is true that that even though that logic is well structured and you can understand it, that doesn't mean you know you're not going to run into problems like you just said like the datomic database is a separate database.
+
+Tony Kay: Even if it was transactional, what if you'd sent what if you side effected and sent the invoice to the Dion? You can't just forget it.
+
+Tony Kay: Right.
+
+Tony Kay: There's another external system that you have to synchronize with that you just can't put in your transaction. You can't say, "Oh, Dion, I want two-phase commit." You know, if I manage to commit my transaction, then pretend like you saw, you know. Um,
+
+Tony Kay: all right. Where we at? That's the hardest part of the system to understand is there's actually an SQL table um that you can in your local uh
+
+Tony Kay: you know, local host
+
+Tony Kay: done. That's cool.
+
+Host: Right. And here's your store,
+
+Tony Kay: right? So there's your running state machine state as be, you know, bite array encoded Eden.
+
+Host: So cool.
+
+Tony Kay: Yeah. And then we even implemented, we don't really use this anymore. Support was sort of abusing it.
+
+Host: Um, uh,
+
+Tony Kay: but there's a paused flag.
+
+Host: Yeah.
+
+Tony Kay: On the state machine state.
+
+Tony Kay: So you can indicate that you want a state machine to not accept events. So that if you're trying to debug something, you can actually pause the state chart and the event delivery system, if it sees this flag set to true, just like
+
+Tony Kay: just doesn't deliver the event and leaves the leaves the leave it marked.
+
+Host: Somebody got their mic unmuted and somebody's talking.
+
+Tony Kay: Sorry. Yeah, it's me, Valentina.
+
+Host: That's Valentina.
+
+Tony Kay: Let me close the door.
+
+Tony Kay: So um so yeah the the way we use them is actually fairly complicated and the startup um most of our most of our thread startup happens in the server component the middle middleware server component. Um,
+
+Tony Kay: and so cute thread start durable event threads. So here's where we actually start all the threads on a GI on all the nodes basically based on our configuration.
+
+Tony Kay: So I can default Eden you know there's some number of threads for the durable event Q and so you can you can configure that right.
+
+Tony Kay: And when we construct the actual environment for our state chart running, we put in all those implementation of those protocols that use the SQL database so that we can do this transactional thing and make sure everything's delivered well.
+
+Tony Kay: So kind of fun.
+
+Tony Kay: In fact, this this flexibility I sort of like I've noticed that most of my libraries aren't terribly popular
+
+Host: in the in the even though they're open sourced.
+
+Tony Kay: Uh some people get them and some people don't. But I think part of the difficulty that people have with my libraries in general is I use the same functional paradigm. But I tend to leave a lot of like flexibility in the implementation so that you can do cool complex things like this. Um but then I don't open source my like you know AWS specific SQL event cue for people to use. And so, you know, people want a turnkey solution and it's it's not turnkey except for folk.
+
+Tony Kay: You can do front end fulcro without having to write anything.
+
+Tony Kay: Anyway, so what other questions did people have about state charts coming into this that maybe they've wondered about that they'd like me to talk about?
+
+Tony Kay: We're over time, but I feel like since we just kind of got to the through the this is how how it's hooked together. Maybe maybe people have some other questions about them that they wanted answered and didn't
+
+Host: I have one
+
+Tony Kay: I I would like to know how to draw
+
+Tony Kay: charts
+
+Host: like I know that we can do diagrams but I
+
+Tony Kay: we have no way of doing those. We have no way of doing those because there was a conflict between the libraries and we never upgraded it. conflict library
+
+Tony Kay: like we we were up upgrading our state chart our state chart version in the tso and something failed and we just immediately stopped it.
+
+Tony Kay: Yeah, we can we can attempt to do that.
+
+Tony Kay: I haven't I've only written I've written two different sort of versions of trying to make state charts something you can have an automated diagram built of.
+
+Tony Kay: Um and is in the state charts library itself in the dev folder this xstate namespace um and this is halfbaked but you could grab this source code and tinker with it so there's a there's a javascripty library out here that does state charts called xate
+
+Tony Kay: and they have a visualizer
+
+Tony Kay: um that you You know, if if you put it in this JavaScripty format, uh, then you can how do you how do you view it? I forget how to how you actually visualize. There we go. It'll draw a nice diagram for you.
+
+Tony Kay: Um, and since this does follow the same state chart standard, technically you can trans translate R Eden into J this
+
+Tony Kay: JavaScript format and then dump it in here and see it.
+
+Tony Kay: Okay.
+
+Host: And so that's what this this would this works on simple simple ones.
+
+Tony Kay: Uh like like here like if I load this name space and dump this this will give me you know something I can translate into JSON.
+
+Host: Yeah.
+
+Tony Kay: Console log cl.js. That should be JSON.
+
+Host: What am I What am I messing up here, guys? Shouldn't that be
+
+Tony Kay: Isn't it because you're in a closure ripple instead of
+
+Host: Yeah. So, if you do this in closure script and then copy this and paste it into that thing, you'll get a diagram.
+
+Tony Kay: Uh the the problem that you run into with translating them is the expressions.
+
+Tony Kay: out of the state chart have to be turned into something JavaScripty and so you end up need to put little stubs in like here right where I'm putting in you know stubs for the different functions that it would want to call and you can't use lambdas so our our the state chart that this one because we don't we just use symbols here um uh I I think technically you could translate this fairly simply. So that's one way. That's one approach,
+
+Tony Kay: right? Is is just use just steal this code out of the state charts GitHub repository and hack on it. It's not that long, right? Uh it's 100 lines of code or 150.
+
+Tony Kay: Yeah.
+
+Tony Kay: Right. So you could probably make this work and then you get this really beautiful, you know, thing that you can like, you know, click on and watch things flow and what have you, right?
+
+Host: Um
+
+Tony Kay: yes that's one way of doing it. The other way is the way I've done it in folk inspect uh which some you know most of you have sort of seen there's a tab in f fulcro inspect where you can go to the state charts and pick a front-end state chart that doesn't help you with backend but uh so these are these are open source contributions nudge nudge hint hint so here's what I've already done in the visualization I made a CLJS visualizer
+
+Tony Kay: and this code goes through and converts uh a state chart into uh DOM and then uses uh this is called the uh Eclipse layout kernel kernel Elk and it turns out there's a JavaScript version of this library and a Java version of this library and what it will do for you is it will position the nodes for you. It'll find a layout, right? If you give it a thousand nodes with all the connections, it'll try to figure out a good layout for those for you, right? Which is actually a very difficult computer science problem. So turning them into DOM nodes is easy.
+
+Tony Kay: And then Elk makes it gives you back the coordinates you should put them at, right? Um and so I've this is what Fulcro is currently using. Folk inspect is this, you know, Fulcrobased
+
+Tony Kay: visualizer component that uses
+
+Tony Kay: hooks that I wrote, right? So, render edges makes an SVG uh for drawing the lines and then it it puts the DOM elements on top of it.
+
+Tony Kay: Um, and then in order to get the elk layout, where is the elk layout? Yeah, use elk layout. I made a a react use effect hook that would call the asynchronous layout function of elk, get back the layout, set the layout so that then the UI updates its draw.
+
+Tony Kay: Okay, there is a Java version of this
+
+Tony Kay: library and I started to implement it here that has basically the same API and it's it's really a translation of the Java code to JavaScript that gives you the JavaScript version.
+
+Tony Kay: And so if you want a closure-based visualizer,
+
+Host: I'm close. I just haven't finished it.
+
+Tony Kay: It's kind of the same basic structure.
+
+Tony Kay: You set the options, you get the layout, and then you would use something like, I don't know, make a JF frame or right here I'm I'm uh still doing DOM and render to string. So then you could just like load that in a browser, right? Um as HTML, that was one idea. Or you could use a JFrame and try to draw the stuff in a Java window. Uh
+
+Host: yeah,
+
+Tony Kay: but the hard part is the layout. The layout's done for you by this library.
+
+Tony Kay: Uh, and so somebody just needs to go in here and finish this. I haven't I haven't finished it.
+
+Tony Kay: So if you wanted a good open source contribution to the state charts library, uh, there's the answer to your question. How do you graph it? Basically like this.
+
+Tony Kay: Who's up? I don't see the hand raising.
+
+Host: No, Evan Evan left the comment. uh to use.
+
+Tony Kay: Yeah, I put I said Java FX maybe and I feel like Donsky Nikita Donssky is got
+
+Tony Kay: um a visualizer be awesome,
+
+Host: right?
+
+Tony Kay: I think there's a
+
+Host: what is it called?
+
+Tony Kay: Like it would be awesome to have a visualizer for portal.
+
+Tony Kay: Yeah. So the other thing that I thought to do because I've got the visualizer in folk inspect is if you add a well-known path ohm resolver where I can say give me the
+
+Tony Kay: state chart definition over the network then we could make the front end fulcr inspect query the backend for your state chart sessions and you could just pick one or autocomplete it and then show it in folk inspect that's another idea
+
+Host: which would be even cooler it would be cooler that would be awesome
+
+Tony Kay: test production So you could do it against dev or production or whatever.
+
+Host: Yeah.
+
+Tony Kay: So that's the answer to that question.
+
+Tony Kay: And it would be really nice to have the drawing. That's part of the reason why I wanted to move to state charts, right? Is that it's easy to think about you can and you can draw it. If you can draw it, way easier to talk about it, right? Point to that, point to that. Like the the
+
+Host: Yeah, you can reason about it. You can just like this is the subscription state chart.
+
+Tony Kay: Yeah.
+
+Host: And it's easier.
+
+Tony Kay: Yeah.
+
+Tony Kay: So I mean the you know the state chart structured data thing it's it's sort of a drawing right you you can kind of like you know look around on it but yeah an actual drawing would be more convenient in a lot of cases.
+
+Tony Kay: We didn't really find the bug right with the library with the stitcher library.
+
+Tony Kay: I don't know. We could that that could be a I mean suggest that as a a thing in retros like Maybe we should do this to get visualizations of state charts
+
+Tony Kay: because then we could draw them and it'd be so cool.
+
+Host: Yep.
+
+Tony Kay: Other questions?
+
+Host: So what happened in Shaki's case that um I think spurred the whole thing was that the the SQL database was plotted. Is
+
+Host: that it?
+
+Tony Kay: No, she had So your SQL database is in Docker. It's persistent. So it had durable events in the event queue that had not been delivered that were tied to a particular session ID that no longer existed in Daytonic.
+
+Tony Kay: So when she started her system up, it went to deliver those events, went to find the state chart session, found a session, but then it referred to company ids that weren't in the datomic database.
+
+Host: So then it couldn't find a database. So then it gave her null pointer exceptions.
+
+Tony Kay: That's interesting.
+
+Host: Oh, but isn't it an SQL inmemory database when we're doing develop? No,
+
+Tony Kay: it's
+
+Tony Kay: you can set it up either way you want, right? You can set it up as H2 which would prevent that problem, but we we I think I recently either I did or somebody did.
+
+Tony Kay: Oh, that's what happened. Yeah,
+
+Host: we changed it. Yeah,
+
+Tony Kay: I think we recently changed this. So, it used um
+
+Host: the the actual database.
+
+Tony Kay: Yeah, utility. You're right. We used to do an H2 database here and that's probably why.
+
+Tony Kay: Yeah, that's why nobody else had the problem up until now.
+
+Host: Yeah, we just did this a few days ago.
+
+Host: That's why
+
+Tony Kay: we could just clean up clean up like when we see we could clean up. It would still
+
+Host: I had not fast enough, right?
+
+Tony Kay: I had Shaki add code to the refresh caches when you seed that deletes all the rows.
+
+Tony Kay: But it would still not be fast enough, right? Because like you we don't see it fast enough when we start the server. So it would
+
+Tony Kay: the strap would still try to do things. It could
+
+Host: before we see.
+
+Tony Kay: Yeah, it could.
+
+Host: Sorry, I didn't follow. What is the utility um on line 57?
+
+Tony Kay: That's where the that's the database that's used for the durable event QE and the state chart working memory,
+
+Host: right? And what we changed was line 58.
+
+Host: Is that it?
+
+Tony Kay: Uh yeah, what we what we changed was uh to use Postgress instead of H2 for this database.
+
+Host: Ah okay.
+
+Host: So,
+
+Tony Kay: so if I if I look at this uh
+
+Host: Oh, it's not showing me the right diffic.
+
+Tony Kay: I thought I was on the right commit.
+
+Tony Kay: No, that's not right. Right. change the mode to use plus double click on it and you have to you have to slide the the bottom right window more to the left. Oh yeah. And that
+
+Tony Kay: I would love to draw but I don't know. Wait, we can Google.
+
+Host: There's this very small death on the bottom right like I was saying.
+
+Tony Kay: Yeah. Bottom right has
+
+Host: Oh, all right. Thank you.
+
+Tony Kay: Would love to draw. I feel I think I know I can. Yeah. Okay. There you go.
+
+Host: Yeah. No, you click on that.
+
+Tony Kay: That's Yeah. So see it used to be an H2 database which is just in memory and so when you restarted that just got wiped out every time.
+
+Host: I see
+
+Tony Kay: I switched it here so you could actually look at it easily with Psql or some other database utility if you wanted to.
+
+Host: God is gooey man.
+
+Tony Kay: All right. Any more any more questions?
+
